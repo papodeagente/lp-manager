@@ -237,6 +237,21 @@ async function coolifyPatchFqdn(fqdns) {
   }
 }
 
+function scheduleCoolifyRestart() {
+  if (!COOLIFY_HOST || !COOLIFY_TOKEN || !COOLIFY_APP_UUID) return;
+  setTimeout(async () => {
+    try {
+      const res = await fetch(`${COOLIFY_HOST}/api/v1/applications/${COOLIFY_APP_UUID}/restart`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${COOLIFY_TOKEN}` },
+      });
+      console.log(`[coolify] auto-restart queued, HTTP ${res.status}`);
+    } catch (e) {
+      console.error('[coolify] auto-restart failed', e.message);
+    }
+  }, 2000);
+}
+
 app.use((req, res, next) => {
   const host = (req.hostname || '').toLowerCase();
 
@@ -368,6 +383,7 @@ app.post('/admin/lps/:slug/domain', requireAuth, async (req, res) => {
       }
     }
 
+    const domainChanged = (lp.custom_domain || null) !== newDomain;
     if (lp.custom_domain && lp.custom_domain !== newDomain) {
       await coolifyRemoveDomain(lp.custom_domain);
     }
@@ -375,9 +391,11 @@ app.post('/admin/lps/:slug/domain', requireAuth, async (req, res) => {
     let coolifyResult = null;
     if (newDomain) coolifyResult = await coolifyAddDomain(newDomain);
 
+    if (domainChanged) scheduleCoolifyRestart();
+
     req.session.flash = newDomain
-      ? `Domínio "${newDomain}" associado a "${lp.slug}". Aponte DNS A → 187.127.6.135.${coolifyResult?.ok === false ? ` (Coolify sync: ${coolifyResult.reason})` : ''}`
-      : `Domínio removido de "${lp.slug}"`;
+      ? `Domínio "${newDomain}" associado a "${lp.slug}". Aponte DNS A → 187.127.6.135. App reiniciando pra aplicar Traefik labels (~30s — aguarde antes de testar).${coolifyResult?.ok === false ? ` (Coolify sync: ${coolifyResult.reason})` : ''}`
+      : `Domínio removido de "${lp.slug}". App reiniciando (~30s).`;
     res.redirect('/admin');
   } catch (e) {
     console.error(e);
