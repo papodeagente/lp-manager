@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LP Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    details > summary { list-style: none; cursor: pointer; }
+    details > summary::-webkit-details-marker { display: none; }
+  </style>
+</head>
+<body class="bg-zinc-50 text-zinc-900 min-h-screen">
+  <%
+    function formatBytes(b) {
+      if (b < 1024) return b + ' B';
+      if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+      return (b / 1024 / 1024).toFixed(2) + ' MB';
+    }
+    function formatDate(ts) {
+      const d = new Date(ts);
+      return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    }
+  %>
+
+  <header class="bg-white border-b border-zinc-200">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold tracking-tight">LP Manager</h1>
+        <p class="text-xs text-zinc-500 mt-0.5"><%= lps.length %> landing page<%= lps.length === 1 ? '' : 's' %></p>
+      </div>
+      <form method="post" action="/admin/logout">
+        <button class="text-sm text-zinc-600 hover:text-zinc-900">Sair</button>
+      </form>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8 space-y-8">
+
+    <% if (flash) { %>
+      <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl px-4 py-3 text-sm">
+        <%= flash %>
+      </div>
+    <% } %>
+
+    <section class="bg-white border border-zinc-200 rounded-2xl p-6">
+      <h2 class="text-lg font-semibold mb-1">Criar nova LP</h2>
+      <p class="text-sm text-zinc-500 mb-4">Upload de ZIP do Claude Design (com index.html + assets) ou criação vazia.</p>
+      <form method="post" action="/admin/lps" enctype="multipart/form-data" class="grid gap-3 sm:grid-cols-3">
+        <input
+          name="name"
+          required
+          placeholder="Nome (ex: Glazi HiPRO)"
+          class="rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+        <input
+          name="slug"
+          placeholder="slug (opcional, derivado do nome)"
+          pattern="[a-z0-9-]*"
+          class="rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+        <input
+          type="file"
+          name="zip"
+          accept=".zip"
+          class="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-zinc-200"
+        >
+        <button class="sm:col-span-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg py-2 text-sm font-medium transition">
+          Criar LP
+        </button>
+      </form>
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-lg font-semibold">Landing pages</h2>
+
+      <% if (!lps.length) { %>
+        <div class="bg-white border border-zinc-200 rounded-2xl p-8 text-center text-sm text-zinc-500">
+          Nenhuma LP ainda. Crie a primeira acima.
+        </div>
+      <% } %>
+
+      <% lps.forEach(function(lp) { %>
+        <article class="bg-white border border-zinc-200 rounded-2xl overflow-hidden">
+          <div class="px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 class="font-semibold truncate"><%= lp.name %></h3>
+                <code class="text-xs text-zinc-500 bg-zinc-100 rounded px-1.5 py-0.5"><%= lp.slug %></code>
+              </div>
+              <div class="text-xs text-zinc-500 mt-1 space-x-3">
+                <span><%= lp.files %> arquivo<%= lp.files === 1 ? '' : 's' %> · <%= formatBytes(lp.size) %></span>
+                <span>index: <code><%= lp.index_file %></code></span>
+                <span>atualizada <%= formatDate(lp.updated_at) %></span>
+              </div>
+              <% if (lp.custom_domain) { %>
+                <div class="mt-2 text-sm">
+                  <a href="https://<%= lp.custom_domain %>" target="_blank" rel="noopener" class="text-indigo-700 hover:underline font-medium">
+                    https://<%= lp.custom_domain %>
+                  </a>
+                </div>
+              <% } else { %>
+                <div class="mt-2 text-xs text-zinc-400">sem domínio público ainda</div>
+              <% } %>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <a href="/p/<%= lp.slug %>/" target="_blank" rel="noopener"
+                class="text-sm rounded-lg border border-zinc-300 px-3 py-1.5 hover:bg-zinc-50">
+                Preview
+              </a>
+            </div>
+          </div>
+
+          <details class="border-t border-zinc-100">
+            <summary class="px-6 py-3 text-sm text-zinc-600 hover:bg-zinc-50 flex items-center justify-between">
+              <span>Ações</span>
+              <span class="text-zinc-400">▾</span>
+            </summary>
+            <div class="px-6 py-4 grid gap-4 sm:grid-cols-2 border-t border-zinc-100 bg-zinc-50/50">
+
+              <form method="post" action="/admin/lps/<%= lp.slug %>/upload" enctype="multipart/form-data" class="space-y-2">
+                <label class="block text-sm font-medium">Re-enviar ZIP (substitui arquivos)</label>
+                <input type="file" name="zip" accept=".zip" required class="text-xs file:mr-2 file:rounded file:border-0 file:bg-white file:px-2 file:py-1 file:text-xs">
+                <button class="block bg-zinc-900 hover:bg-zinc-800 text-white text-sm rounded-lg px-3 py-1.5">Subir ZIP</button>
+              </form>
+
+              <form method="post" action="/admin/lps/<%= lp.slug %>/duplicate" class="space-y-2">
+                <label class="block text-sm font-medium">Duplicar LP</label>
+                <input name="new_slug" placeholder="novo-slug (opcional)" pattern="[a-z0-9-]*" class="w-full rounded border border-zinc-300 px-2 py-1 text-sm">
+                <button class="block bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg px-3 py-1.5">Duplicar</button>
+              </form>
+
+              <form method="post" action="/admin/lps/<%= lp.slug %>/domain" class="space-y-2 sm:col-span-1">
+                <label class="block text-sm font-medium">Domínio público</label>
+                <input
+                  name="domain"
+                  value="<%= lp.custom_domain || '' %>"
+                  placeholder="ex: draglazi.com.br (vazio = remover)"
+                  class="w-full rounded border border-zinc-300 px-2 py-1 text-sm"
+                >
+                <p class="text-xs text-zinc-500">Aponte DNS A → 187.127.6.135 antes/depois. SSL emite automático.</p>
+                <button class="block bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg px-3 py-1.5">Salvar domínio</button>
+              </form>
+
+              <form method="post" action="/admin/lps/<%= lp.slug %>/index-file" class="space-y-2 sm:col-span-1">
+                <label class="block text-sm font-medium">Arquivo index</label>
+                <input name="index_file" value="<%= lp.index_file %>" class="w-full rounded border border-zinc-300 px-2 py-1 text-sm font-mono">
+                <p class="text-xs text-zinc-500">Caminho relativo ao root da LP. Default: <code>index.html</code></p>
+                <button class="block bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg px-3 py-1.5">Salvar index</button>
+              </form>
+
+              <form method="post" action="/admin/lps/<%= lp.slug %>/delete" onsubmit="return confirm('Deletar a LP <%= lp.slug %> e seus arquivos? Isso é irreversível.')" class="sm:col-span-2 pt-2 border-t border-zinc-200">
+                <button class="text-sm text-red-700 hover:text-red-900 hover:underline">
+                  Deletar LP
+                </button>
+              </form>
+
+            </div>
+          </details>
+        </article>
+      <% }) %>
+    </section>
+
+  </main>
+</body>
+</html>
