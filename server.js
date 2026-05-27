@@ -179,6 +179,10 @@ function detectIndex(dir) {
   return htmls[0] || 'index.html';
 }
 
+function domainVariants(apex) {
+  return [`https://${apex}`, `https://www.${apex}`];
+}
+
 async function coolifyAddDomain(domain) {
   if (!COOLIFY_HOST || !COOLIFY_TOKEN || !COOLIFY_APP_UUID) {
     console.warn('[coolify] credentials missing, skipping domain sync');
@@ -187,8 +191,9 @@ async function coolifyAddDomain(domain) {
   const cur = await coolifyGetApp();
   if (!cur) return { ok: false, reason: 'get-app-failed' };
   const fqdns = (cur.fqdn || '').split(',').map((s) => s.trim()).filter(Boolean);
-  const target = `https://${domain}`;
-  if (!fqdns.includes(target)) fqdns.push(target);
+  for (const target of domainVariants(domain)) {
+    if (!fqdns.includes(target)) fqdns.push(target);
+  }
   return coolifyPatchFqdn(fqdns);
 }
 
@@ -196,8 +201,12 @@ async function coolifyRemoveDomain(domain) {
   if (!COOLIFY_HOST || !COOLIFY_TOKEN || !COOLIFY_APP_UUID) return { ok: false, reason: 'missing-credentials' };
   const cur = await coolifyGetApp();
   if (!cur) return { ok: false, reason: 'get-app-failed' };
+  const drop = new Set([
+    `https://${domain}`, `http://${domain}`,
+    `https://www.${domain}`, `http://www.${domain}`,
+  ]);
   const fqdns = (cur.fqdn || '').split(',').map((s) => s.trim()).filter(Boolean)
-    .filter((f) => f !== `https://${domain}` && f !== `http://${domain}`);
+    .filter((f) => !drop.has(f));
   return coolifyPatchFqdn(fqdns);
 }
 
@@ -233,7 +242,8 @@ app.use((req, res, next) => {
 
   if (isAdminHost(req)) return next();
 
-  const lp = stmts.getByDomain.get(host);
+  const apex = host.startsWith('www.') ? host.slice(4) : host;
+  const lp = stmts.getByDomain.get(apex);
   if (!lp) {
     return res.status(404).type('text/plain').send(`Nenhuma LP configurada para ${host}`);
   }
@@ -346,7 +356,7 @@ app.post('/admin/lps/:slug/domain', requireAuth, async (req, res) => {
   try {
     const lp = stmts.get.get(req.params.slug);
     if (!lp) return res.status(404).send('LP não existe');
-    const newDomain = (req.body.domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '') || null;
+    const newDomain = (req.body.domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '') || null;
 
     if (newDomain && newDomain === ADMIN_HOST.toLowerCase()) {
       return res.status(400).send('Esse domínio é reservado pro admin');
