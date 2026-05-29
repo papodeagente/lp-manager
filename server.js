@@ -1,5 +1,6 @@
 import express from 'express';
 import session from 'express-session';
+import compression from 'compression';
 import multer from 'multer';
 import AdmZip from 'adm-zip';
 import Database from 'better-sqlite3';
@@ -54,6 +55,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', 1);
 
+app.use(compression({ threshold: 1024 }));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(session({
@@ -271,6 +273,14 @@ app.use((req, res, next) => {
   }
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     return res.status(404).type('text/plain').send('Not found');
+  }
+  const ext = path.extname(filePath).toLowerCase();
+  if (['.jpg','.jpeg','.png','.webp','.gif','.svg','.ico','.mp4','.webm','.woff','.woff2','.ttf','.eot','.otf'].includes(ext)) {
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  } else if (ext === '.css' || ext === '.js') {
+    res.set('Cache-Control', 'public, max-age=86400');
+  } else if (ext === '.html' || ext === '') {
+    res.set('Cache-Control', 'public, max-age=300, must-revalidate');
   }
   return res.sendFile(filePath);
 });
