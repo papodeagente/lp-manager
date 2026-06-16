@@ -43,6 +43,12 @@
       </div>
     <% } %>
 
+    <% if (typeof flashWarn !== 'undefined' && flashWarn) { %>
+      <div class="bg-amber-50 border border-amber-300 text-amber-900 rounded-xl px-4 py-3 text-sm">
+        ⚠️ <%= flashWarn %>
+      </div>
+    <% } %>
+
     <section class="bg-white border border-zinc-200 rounded-2xl p-6">
       <h2 class="text-lg font-semibold mb-1">Criar nova LP</h2>
       <p class="text-sm text-zinc-500 mb-4">Upload de ZIP do Claude Design (com index.html + assets) ou criação vazia.</p>
@@ -143,9 +149,18 @@
               </form>
 
               <form method="post" action="/admin/lps/<%= lp.slug %>/index-file" class="space-y-2 sm:col-span-1">
-                <label class="block text-sm font-medium">Arquivo index</label>
-                <input name="index_file" value="<%= lp.index_file %>" class="w-full rounded border border-zinc-300 px-2 py-1 text-sm font-mono">
-                <p class="text-xs text-zinc-500">Caminho relativo ao root da LP. Default: <code>index.html</code></p>
+                <label class="block text-sm font-medium">Arquivo index (home)</label>
+                <% if (lp.htmls && lp.htmls.length > 1) { %>
+                  <select name="index_file" class="w-full rounded border border-zinc-300 px-2 py-1 text-sm font-mono">
+                    <% lp.htmls.forEach(function(h) { %>
+                      <option value="<%= h %>" <%= h === lp.index_file ? 'selected' : '' %>><%= h %></option>
+                    <% }) %>
+                  </select>
+                  <p class="text-xs text-zinc-500">Esta LP tem <%= lp.htmls.length %> páginas. Escolha qual é a home. Se for um standalone, é desempacotado ao salvar.</p>
+                <% } else { %>
+                  <input name="index_file" value="<%= lp.index_file %>" class="w-full rounded border border-zinc-300 px-2 py-1 text-sm font-mono">
+                  <p class="text-xs text-zinc-500">Caminho relativo ao root da LP. Default: <code>index.html</code></p>
+                <% } %>
                 <button class="block bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg px-3 py-1.5">Salvar index</button>
               </form>
 

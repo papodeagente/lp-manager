@@ -119,7 +119,8 @@ function listLPs() {
       };
       try { walk(dir); } catch (_) {}
     }
-    return { ...lp, files, size, has_files: exists };
+    const htmls = exists ? listHtmls(dir) : [];
+    return { ...lp, files, size, has_files: exists, htmls };
   });
 }
 
@@ -382,31 +383,47 @@ async function unbundleStandalone(html) {
   return { indexHtml: template, assets };
 }
 
-async function maybeUnbundle(dir) {
-  let target = null;
-  const walk = (p) => {
+function listHtmls(dir) {
+  const out = [];
+  const walk = (p, rel = '') => {
     for (const e of fs.readdirSync(p, { withFileTypes: true })) {
-      if (target) return;
-      const fp = path.join(p, e.name);
-      if (e.isDirectory()) walk(fp);
-      else if (e.name.toLowerCase().endsWith('.html') && isStandaloneBundle(fs.readFileSync(fp, 'utf8'))) {
-        target = fp;
-      }
+      const sub = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(path.join(p, e.name), sub);
+      else if (e.name.toLowerCase().endsWith('.html')) out.push(sub);
     }
   };
-  try { walk(dir); } catch { return null; }
-  if (!target) return null;
+  try { walk(dir); } catch {}
+  return out;
+}
 
-  const result = await unbundleStandalone(fs.readFileSync(target, 'utf8'));
+// Decide qual HTML é a home. Se tem index.html, usa. Se tem 1 só, usa. Se tem
+// vários e nenhum index.html, marca ambíguo (o handler avisa e deixa escolher).
+function resolveIndex(dir) {
+  if (fs.existsSync(path.join(dir, 'index.html'))) {
+    return { index: 'index.html', ambiguous: false, candidates: ['index.html'] };
+  }
+  const htmls = listHtmls(dir);
+  if (htmls.length === 0) return { index: 'index.html', ambiguous: false, candidates: [] };
+  if (htmls.length === 1) return { index: htmls[0], ambiguous: false, candidates: htmls };
+  // Vários HTMLs sem index.html: default = um que contenha "index", senão o 1º.
+  const prefer = htmls.find((h) => /index/i.test(path.basename(h))) || htmls[0];
+  return { index: prefer, ambiguous: true, candidates: htmls };
+}
+
+// Desempacota UM arquivo HTML específico se ele for standalone; senão retorna null.
+async function unbundleHtml(dir, htmlAbsPath) {
+  let html;
+  try { html = fs.readFileSync(htmlAbsPath, 'utf8'); } catch { return null; }
+  if (!isStandaloneBundle(html)) return null;
+  const result = await unbundleStandalone(html);
   if (!result) return null;
-
   for (const a of result.assets) {
     const out = path.join(dir, a.name);
     fs.mkdirSync(path.dirname(out), { recursive: true });
     fs.writeFileSync(out, a.buffer);
   }
   fs.writeFileSync(path.join(dir, 'index.html'), result.indexHtml);
-  if (path.basename(target).toLowerCase() !== 'index.html') { try { fs.rmSync(target); } catch {} }
+  if (path.basename(htmlAbsPath).toLowerCase() !== 'index.html') { try { fs.rmSync(htmlAbsPath); } catch {} }
   return { index: 'index.html', assets: result.assets.length };
 }
 
@@ -529,8 +546,13 @@ app.post('/admin/logout', (req, res) => {
 });
 
 app.get('/admin', requireAuth, (req, res) => {
-  res.render('dashboard', { lps: listLPs(), flash: req.session.flash || null });
+  res.render('dashboard', {
+    lps: listLPs(),
+    flash: req.session.flash || null,
+    flashWarn: req.session.flashWarn || null,
+  });
   req.session.flash = null;
+  req.session.flashWarn = null;
 });
 
 app.post('/admin/lps', requireAuth, upload.single('zip'), async (req, res) => {
@@ -543,10 +565,17 @@ app.post('/admin/lps', requireAuth, upload.single('zip'), async (req, res) => {
     let indexFile = 'index.html';
     let opt = { count: 0, before: 0, after: 0 };
     let unb = null;
+    let warn = null;
     if (req.file) {
-      indexFile = extractZip(req.file.buffer, siteDir(slug));
-      unb = await maybeUnbundle(siteDir(slug));
-      if (unb) indexFile = unb.index;
+      extractZip(req.file.buffer, siteDir(slug));
+      const r = resolveIndex(siteDir(slug));
+      indexFile = r.index;
+      if (r.ambiguous) {
+        warn = `ZIP com ${r.candidates.length} páginas e sem index.html. Servindo "${r.index}" por padrão — escolha a correta em "Arquivo index" abaixo.`;
+      } else {
+        unb = await unbundleHtml(siteDir(slug), path.join(siteDir(slug), r.index));
+        if (unb) indexFile = unb.index;
+      }
       opt = await optimizeImages(siteDir(slug));
     } else {
       fs.mkdirSync(siteDir(slug), { recursive: true });
@@ -556,6 +585,7 @@ app.post('/admin/lps', requireAuth, upload.single('zip'), async (req, res) => {
 
     const now = Date.now();
     stmts.insert.run(slug, name || slug, null, indexFile, now, now);
+    req.session.flashWarn = warn;
     req.session.flash = `LP "${slug}" criada`
       + (unb ? ` · standalone desempacotado (${unb.assets} assets)` : '')
       + (opt.count ? ` · ${opt.count} imagens otimizadas (${fmtKB(opt.before)} → ${fmtKB(opt.after)})` : '');
@@ -572,11 +602,20 @@ app.post('/admin/lps/:slug/upload', requireAuth, upload.single('zip'), async (re
     if (!lp) return res.status(404).send('LP não existe');
     if (!req.file) return res.status(400).send('ZIP ausente');
 
-    let indexFile = extractZip(req.file.buffer, siteDir(lp.slug));
-    const unb = await maybeUnbundle(siteDir(lp.slug));
-    if (unb) indexFile = unb.index;
+    extractZip(req.file.buffer, siteDir(lp.slug));
+    const r = resolveIndex(siteDir(lp.slug));
+    let indexFile = r.index;
+    let unb = null;
+    let warn = null;
+    if (r.ambiguous) {
+      warn = `ZIP com ${r.candidates.length} páginas e sem index.html. Servindo "${r.index}" por padrão — escolha a correta em "Arquivo index" abaixo.`;
+    } else {
+      unb = await unbundleHtml(siteDir(lp.slug), path.join(siteDir(lp.slug), r.index));
+      if (unb) indexFile = unb.index;
+    }
     const opt = await optimizeImages(siteDir(lp.slug));
     stmts.updateIndex.run(indexFile, Date.now(), lp.slug);
+    req.session.flashWarn = warn;
     req.session.flash = `ZIP importado para "${lp.slug}" (index: ${indexFile})`
       + (unb ? ` · standalone desempacotado (${unb.assets} assets)` : '')
       + (opt.count ? ` · ${opt.count} imagens otimizadas (${fmtKB(opt.before)} → ${fmtKB(opt.after)})` : '');
@@ -666,16 +705,33 @@ app.post('/admin/lps/:slug/domain', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/admin/lps/:slug/index-file', requireAuth, (req, res) => {
-  const lp = stmts.get.get(req.params.slug);
-  if (!lp) return res.status(404).send('LP não existe');
-  const file = (req.body.index_file || '').trim();
-  if (!file) return res.status(400).send('arquivo vazio');
-  const fp = path.join(siteDir(lp.slug), file);
-  if (!fs.existsSync(fp)) return res.status(404).send(`${file} não existe na LP`);
-  stmts.updateIndex.run(file, Date.now(), lp.slug);
-  req.session.flash = `Index de "${lp.slug}" → ${file}`;
-  res.redirect('/admin');
+app.post('/admin/lps/:slug/index-file', requireAuth, async (req, res) => {
+  try {
+    const lp = stmts.get.get(req.params.slug);
+    if (!lp) return res.status(404).send('LP não existe');
+    const file = (req.body.index_file || '').trim();
+    if (!file) return res.status(400).send('arquivo vazio');
+    const fp = path.join(siteDir(lp.slug), file);
+    if (!fp.startsWith(siteDir(lp.slug) + path.sep) || !fs.existsSync(fp)) {
+      return res.status(404).send(`${file} não existe na LP`);
+    }
+    // Se a página escolhida for um standalone, desempacota na hora.
+    let idx = file;
+    let extra = '';
+    const unb = await unbundleHtml(siteDir(lp.slug), fp);
+    if (unb) {
+      idx = unb.index;
+      const opt = await optimizeImages(siteDir(lp.slug));
+      extra = ` · standalone desempacotado (${unb.assets} assets`
+        + (opt.count ? `, ${opt.count} imgs ${fmtKB(opt.before)}→${fmtKB(opt.after)}` : '') + ')';
+    }
+    stmts.updateIndex.run(idx, Date.now(), lp.slug);
+    req.session.flash = `Index de "${lp.slug}" → ${idx}${extra}`;
+    res.redirect('/admin');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send(`Erro: ${e.message}`);
+  }
 });
 
 app.post('/admin/lps/:slug/delete', requireAuth, async (req, res) => {
