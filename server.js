@@ -181,6 +181,133 @@ function detectIndex(dir) {
   return htmls[0] || 'index.html';
 }
 
+// ── Cache-busting ──────────────────────────────────────────────────────────
+// Acrescenta ?v=<versão da LP> nas referências de assets do HTML/CSS. Assim os
+// assets ficam com cache "immutable" (carregamento ultra rápido em revisitas),
+// mas todo re-upload muda a versão → a URL muda → o browser baixa o novo. Sem
+// isso, imagens de mesmo nome ficavam presas no cache por 1 ano.
+const BUSTABLE_EXT = new Set([
+  'css', 'js', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'ico', 'avif',
+  'woff', 'woff2', 'ttf', 'eot', 'otf', 'mp4', 'webm', 'ogg', 'mp3', 'm4a',
+]);
+
+function isBustable(url) {
+  if (!url) return false;
+  const u = url.trim();
+  if (/^(https?:)?\/\//i.test(u)) return false;
+  if (/^(data:|blob:|mailto:|tel:|javascript:|#)/i.test(u)) return false;
+  const ext = u.split(/[?#]/)[0].split('.').pop()?.toLowerCase();
+  return !!ext && BUSTABLE_EXT.has(ext);
+}
+
+function withVersion(url, v) {
+  if (!isBustable(url) || /[?&]v=/.test(url)) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'v=' + v;
+}
+
+function bustRefs(text, v) {
+  text = text.replace(/\b(src|href|poster)\s*=\s*("|')(.*?)\2/gi,
+    (_m, attr, q, url) => `${attr}=${q}${withVersion(url, v)}${q}`);
+  text = text.replace(/\bsrcset\s*=\s*("|')(.*?)\1/gi, (_m, q, val) => {
+    const out = val.split(',').map((part) => {
+      const seg = part.trim();
+      const sp = seg.indexOf(' ');
+      return sp === -1
+        ? withVersion(seg, v)
+        : withVersion(seg.slice(0, sp), v) + seg.slice(sp);
+    }).join(', ');
+    return `srcset=${q}${out}${q}`;
+  });
+  text = text.replace(/url\(\s*("|'|)([^"')]+)\1\s*\)/gi,
+    (_m, q, url) => `url(${q}${withVersion(url, v)}${q})`);
+  return text;
+}
+
+const IMMUTABLE = 'public, max-age=31536000, immutable';
+const LONG_CACHE_EXT = new Set([
+  '.js', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.ico', '.avif',
+  '.mp4', '.webm', '.ogg', '.mp3', '.m4a', '.woff', '.woff2', '.ttf', '.eot', '.otf',
+]);
+
+function serveStatic(req, res, lp, filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const v = lp.updated_at;
+  if (ext === '.html' || ext === '.htm' || ext === '') {
+    res.set('Cache-Control', 'no-cache');
+    return res.type('html').send(bustRefs(fs.readFileSync(filePath, 'utf8'), v));
+  }
+  if (ext === '.css') {
+    res.set('Cache-Control', IMMUTABLE);
+    return res.type('css').send(bustRefs(fs.readFileSync(filePath, 'utf8'), v));
+  }
+  res.set('Cache-Control', LONG_CACHE_EXT.has(ext) ? IMMUTABLE : 'no-cache');
+  return res.sendFile(filePath);
+}
+
+// ── Compressão de imagens ──────────────────────────────────────────────────
+// Roda após extrair o ZIP: redimensiona imagens gigantes e re-encoda (mantendo
+// o formato, pra não quebrar as referências) — só substitui se ficar menor.
+const MAX_IMG_WIDTH = 2000;
+
+// Carrega o sharp sob demanda. Se o binário nativo não estiver disponível no
+// host, a compressão é pulada silenciosamente em vez de derrubar o servidor.
+let _sharp;
+async function loadSharp() {
+  if (_sharp !== undefined) return _sharp;
+  try {
+    _sharp = (await import('sharp')).default;
+  } catch (e) {
+    console.error('[optimize] sharp indisponível, pulando compressão:', e.message);
+    _sharp = null;
+  }
+  return _sharp;
+}
+
+async function optimizeImages(dir) {
+  const sharp = await loadSharp();
+  if (!sharp) return { count: 0, before: 0, after: 0 };
+
+  const files = [];
+  const walk = (p) => {
+    for (const e of fs.readdirSync(p, { withFileTypes: true })) {
+      const fp = path.join(p, e.name);
+      if (e.isDirectory()) walk(fp);
+      else files.push(fp);
+    }
+  };
+  try { walk(dir); } catch { return { count: 0, before: 0, after: 0 }; }
+
+  let count = 0, before = 0, after = 0;
+  for (const fp of files) {
+    const ext = path.extname(fp).toLowerCase();
+    if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) continue;
+    try {
+      const orig = fs.readFileSync(fp);
+      const img = sharp(orig, { failOn: 'none' }).rotate();
+      const meta = await img.metadata();
+      let pipe = img;
+      if (meta.width && meta.width > MAX_IMG_WIDTH) {
+        pipe = pipe.resize({ width: MAX_IMG_WIDTH, withoutEnlargement: true });
+      }
+      if (ext === '.png') pipe = pipe.png({ compressionLevel: 9, effort: 10 });
+      else if (ext === '.webp') pipe = pipe.webp({ quality: 80, effort: 5 });
+      else pipe = pipe.jpeg({ quality: 82, mozjpeg: true });
+      const out = await pipe.toBuffer();
+      if (out.length < orig.length) {
+        fs.writeFileSync(fp, out);
+        count++; before += orig.length; after += out.length;
+      }
+    } catch (e) {
+      console.warn('[optimize] skip', fp, e.message);
+    }
+  }
+  return { count, before, after };
+}
+
+function fmtKB(b) {
+  return b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1024 / 1024).toFixed(2)} MB`;
+}
+
 function domainVariants(apex) {
   return [`https://${apex}`, `https://www.${apex}`];
 }
@@ -274,15 +401,7 @@ app.use((req, res, next) => {
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     return res.status(404).type('text/plain').send('Not found');
   }
-  const ext = path.extname(filePath).toLowerCase();
-  if (['.jpg','.jpeg','.png','.webp','.gif','.svg','.ico','.mp4','.webm','.woff','.woff2','.ttf','.eot','.otf'].includes(ext)) {
-    res.set('Cache-Control', 'public, max-age=31536000, immutable');
-  } else if (ext === '.css' || ext === '.js') {
-    res.set('Cache-Control', 'public, max-age=86400');
-  } else if (ext === '.html' || ext === '') {
-    res.set('Cache-Control', 'public, max-age=300, must-revalidate');
-  }
-  return res.sendFile(filePath);
+  return serveStatic(req, res, lp, filePath);
 });
 
 app.get('/', (req, res) => res.redirect('/admin'));
@@ -320,8 +439,10 @@ app.post('/admin/lps', requireAuth, upload.single('zip'), async (req, res) => {
     if (stmts.get.get(slug)) return res.status(409).send(`Slug "${slug}" já existe`);
 
     let indexFile = 'index.html';
+    let opt = { count: 0, before: 0, after: 0 };
     if (req.file) {
       indexFile = extractZip(req.file.buffer, siteDir(slug));
+      opt = await optimizeImages(siteDir(slug));
     } else {
       fs.mkdirSync(siteDir(slug), { recursive: true });
       fs.writeFileSync(path.join(siteDir(slug), 'index.html'),
@@ -330,7 +451,9 @@ app.post('/admin/lps', requireAuth, upload.single('zip'), async (req, res) => {
 
     const now = Date.now();
     stmts.insert.run(slug, name || slug, null, indexFile, now, now);
-    req.session.flash = `LP "${slug}" criada`;
+    req.session.flash = `LP "${slug}" criada` + (opt.count
+      ? ` · ${opt.count} imagens otimizadas (${fmtKB(opt.before)} → ${fmtKB(opt.after)})`
+      : '');
     res.redirect('/admin');
   } catch (e) {
     console.error(e);
@@ -338,15 +461,18 @@ app.post('/admin/lps', requireAuth, upload.single('zip'), async (req, res) => {
   }
 });
 
-app.post('/admin/lps/:slug/upload', requireAuth, upload.single('zip'), (req, res) => {
+app.post('/admin/lps/:slug/upload', requireAuth, upload.single('zip'), async (req, res) => {
   try {
     const lp = stmts.get.get(req.params.slug);
     if (!lp) return res.status(404).send('LP não existe');
     if (!req.file) return res.status(400).send('ZIP ausente');
 
     const indexFile = extractZip(req.file.buffer, siteDir(lp.slug));
+    const opt = await optimizeImages(siteDir(lp.slug));
     stmts.updateIndex.run(indexFile, Date.now(), lp.slug);
-    req.session.flash = `ZIP importado para "${lp.slug}" (index: ${indexFile})`;
+    req.session.flash = `ZIP importado para "${lp.slug}" (index: ${indexFile})` + (opt.count
+      ? ` · ${opt.count} imagens otimizadas (${fmtKB(opt.before)} → ${fmtKB(opt.after)})`
+      : '');
     res.redirect('/admin');
   } catch (e) {
     console.error(e);
@@ -445,7 +571,7 @@ app.use('/p/:slug', requireAuth, (req, res, next) => {
     return res.status(403).send('forbidden');
   }
   if (!fs.existsSync(fp) || fs.statSync(fp).isDirectory()) return res.status(404).send('not found');
-  res.sendFile(fp);
+  return serveStatic(req, res, lp, fp);
 });
 
 app.get('/healthz', (req, res) => res.json({ ok: true, lps: stmts.list.all().length }));
