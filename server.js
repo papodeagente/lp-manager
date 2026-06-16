@@ -587,6 +587,26 @@ app.post('/admin/lps/:slug/upload', requireAuth, upload.single('zip'), async (re
   }
 });
 
+app.get('/admin/lps/:slug/files', requireAuth, (req, res) => {
+  const lp = stmts.get.get(req.params.slug);
+  if (!lp) return res.status(404).json({ error: 'LP não existe' });
+  const dir = siteDir(lp.slug);
+  const out = [];
+  const walk = (p, rel = '') => {
+    for (const e of fs.readdirSync(p, { withFileTypes: true })) {
+      const sub = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(path.join(p, e.name), sub);
+      else out.push({ path: sub, size: fs.statSync(path.join(p, e.name)).size });
+    }
+  };
+  try { walk(dir); } catch (e) { return res.status(500).json({ error: e.message }); }
+  out.sort((a, b) => b.size - a.size);
+  res.json({
+    slug: lp.slug, index_file: lp.index_file, updated_at: lp.updated_at,
+    count: out.length, total: out.reduce((s, f) => s + f.size, 0), files: out,
+  });
+});
+
 app.post('/admin/lps/:slug/duplicate', requireAuth, (req, res) => {
   try {
     const src = stmts.get.get(req.params.slug);
