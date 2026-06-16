@@ -6,6 +6,7 @@ import AdmZip from 'adm-zip';
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
@@ -308,6 +309,107 @@ function fmtKB(b) {
   return b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1024 / 1024).toFixed(2)} MB`;
 }
 
+// ── Unbundle do "standalone" do Claude Design ──────────────────────────────
+// O export standalone é um HTML de vários MB: 99% JS, com os assets em
+// base64+gzip num <script type="__bundler/manifest"> e o HTML real num
+// <script type="__bundler/template">, remontados via blob: no cliente
+// (lento). Aqui desempacotamos: gravamos cada asset como arquivo real,
+// convertemos fotos PNG/JPEG pra WebP e reescrevemos as refs do template.
+// Resultado: HTML pequeno + assets cacheáveis em paralelo.
+const MIME_EXT = {
+  'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/webp': 'webp',
+  'image/gif': 'gif', 'image/avif': 'avif', 'image/svg+xml': 'svg',
+  'image/x-icon': 'ico', 'image/vnd.microsoft.icon': 'ico',
+  'font/woff2': 'woff2', 'font/woff': 'woff', 'font/ttf': 'ttf', 'font/otf': 'otf',
+  'application/font-woff2': 'woff2', 'application/font-woff': 'woff',
+  'video/mp4': 'mp4', 'video/webm': 'webm', 'audio/mpeg': 'mp3',
+  'text/css': 'css', 'application/javascript': 'js', 'text/javascript': 'js',
+};
+function mimeToExt(mime) {
+  if (MIME_EXT[mime]) return MIME_EXT[mime];
+  const sub = String(mime || '').split('/')[1] || 'bin';
+  return sub.split('+')[0].replace(/[^a-z0-9]/gi, '') || 'bin';
+}
+
+function grabBundlerTag(html, type) {
+  const re = new RegExp(`<script\\s+type="${type.replace('/', '\\/')}"[^>]*>([\\s\\S]*?)<\\/script>`, 'i');
+  const m = re.exec(html);
+  return m ? m[1] : null;
+}
+
+function isStandaloneBundle(html) {
+  return /<script\s+type="__bundler\/manifest"/i.test(html);
+}
+
+async function unbundleStandalone(html) {
+  const manifestRaw = grabBundlerTag(html, '__bundler/manifest');
+  const templateRaw = grabBundlerTag(html, '__bundler/template');
+  if (!manifestRaw || !templateRaw) return null;
+  let manifest, template;
+  try {
+    manifest = JSON.parse(manifestRaw);
+    template = JSON.parse(templateRaw);
+  } catch {
+    return null;
+  }
+
+  const sharp = await loadSharp();
+  const assets = [];
+  const map = {};
+  for (const [uuid, a] of Object.entries(manifest)) {
+    let buf = Buffer.from(a.data, 'base64');
+    if (a.compressed) { try { buf = zlib.gunzipSync(buf); } catch {} }
+    let ext = mimeToExt(a.mime);
+    if (sharp && (a.mime === 'image/png' || a.mime === 'image/jpeg')) {
+      try {
+        const img = sharp(buf, { failOn: 'none' }).rotate();
+        const meta = await img.metadata();
+        let pipe = img;
+        if (meta.width && meta.width > MAX_IMG_WIDTH) {
+          pipe = pipe.resize({ width: MAX_IMG_WIDTH, withoutEnlargement: true });
+        }
+        const webp = await pipe.webp({ quality: 82, effort: 5 }).toBuffer();
+        if (webp.length < buf.length) { buf = webp; ext = 'webp'; }
+      } catch (e) {
+        console.warn('[unbundle] conversão webp falhou', uuid, e.message);
+      }
+    }
+    const rel = `assets/${uuid}.${ext}`;
+    assets.push({ name: rel, buffer: buf });
+    map[uuid] = rel;
+  }
+  for (const [uuid, rel] of Object.entries(map)) template = template.split(uuid).join(rel);
+  return { indexHtml: template, assets };
+}
+
+async function maybeUnbundle(dir) {
+  let target = null;
+  const walk = (p) => {
+    for (const e of fs.readdirSync(p, { withFileTypes: true })) {
+      if (target) return;
+      const fp = path.join(p, e.name);
+      if (e.isDirectory()) walk(fp);
+      else if (e.name.toLowerCase().endsWith('.html') && isStandaloneBundle(fs.readFileSync(fp, 'utf8'))) {
+        target = fp;
+      }
+    }
+  };
+  try { walk(dir); } catch { return null; }
+  if (!target) return null;
+
+  const result = await unbundleStandalone(fs.readFileSync(target, 'utf8'));
+  if (!result) return null;
+
+  for (const a of result.assets) {
+    const out = path.join(dir, a.name);
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, a.buffer);
+  }
+  fs.writeFileSync(path.join(dir, 'index.html'), result.indexHtml);
+  if (path.basename(target).toLowerCase() !== 'index.html') { try { fs.rmSync(target); } catch {} }
+  return { index: 'index.html', assets: result.assets.length };
+}
+
 function domainVariants(apex) {
   return [`https://${apex}`, `https://www.${apex}`];
 }
@@ -440,8 +542,11 @@ app.post('/admin/lps', requireAuth, upload.single('zip'), async (req, res) => {
 
     let indexFile = 'index.html';
     let opt = { count: 0, before: 0, after: 0 };
+    let unb = null;
     if (req.file) {
       indexFile = extractZip(req.file.buffer, siteDir(slug));
+      unb = await maybeUnbundle(siteDir(slug));
+      if (unb) indexFile = unb.index;
       opt = await optimizeImages(siteDir(slug));
     } else {
       fs.mkdirSync(siteDir(slug), { recursive: true });
@@ -451,9 +556,9 @@ app.post('/admin/lps', requireAuth, upload.single('zip'), async (req, res) => {
 
     const now = Date.now();
     stmts.insert.run(slug, name || slug, null, indexFile, now, now);
-    req.session.flash = `LP "${slug}" criada` + (opt.count
-      ? ` · ${opt.count} imagens otimizadas (${fmtKB(opt.before)} → ${fmtKB(opt.after)})`
-      : '');
+    req.session.flash = `LP "${slug}" criada`
+      + (unb ? ` · standalone desempacotado (${unb.assets} assets)` : '')
+      + (opt.count ? ` · ${opt.count} imagens otimizadas (${fmtKB(opt.before)} → ${fmtKB(opt.after)})` : '');
     res.redirect('/admin');
   } catch (e) {
     console.error(e);
@@ -467,12 +572,14 @@ app.post('/admin/lps/:slug/upload', requireAuth, upload.single('zip'), async (re
     if (!lp) return res.status(404).send('LP não existe');
     if (!req.file) return res.status(400).send('ZIP ausente');
 
-    const indexFile = extractZip(req.file.buffer, siteDir(lp.slug));
+    let indexFile = extractZip(req.file.buffer, siteDir(lp.slug));
+    const unb = await maybeUnbundle(siteDir(lp.slug));
+    if (unb) indexFile = unb.index;
     const opt = await optimizeImages(siteDir(lp.slug));
     stmts.updateIndex.run(indexFile, Date.now(), lp.slug);
-    req.session.flash = `ZIP importado para "${lp.slug}" (index: ${indexFile})` + (opt.count
-      ? ` · ${opt.count} imagens otimizadas (${fmtKB(opt.before)} → ${fmtKB(opt.after)})`
-      : '');
+    req.session.flash = `ZIP importado para "${lp.slug}" (index: ${indexFile})`
+      + (unb ? ` · standalone desempacotado (${unb.assets} assets)` : '')
+      + (opt.count ? ` · ${opt.count} imagens otimizadas (${fmtKB(opt.before)} → ${fmtKB(opt.after)})` : '');
     res.redirect('/admin');
   } catch (e) {
     console.error(e);
