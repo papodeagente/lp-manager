@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Leads · <%= lp.name %> · LP Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-50 text-zinc-900 min-h-screen">
+  <%
+    function fmtDate(ts) {
+      try { return new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }); }
+      catch (e) { return '—'; }
+    }
+    function digits(v) { return (v || '').replace(/\D/g, ''); }
+    function statusClass(s) {
+      if (!s) return 'text-zinc-400';
+      if (s.indexOf('ok') === 0) return 'text-emerald-600';
+      return 'text-amber-600';
+    }
+  %>
+
+  <header class="bg-white border-b border-zinc-200">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div>
+        <a href="/admin" class="text-xs text-zinc-500 hover:text-zinc-900">&larr; Voltar</a>
+        <h1 class="text-xl font-bold tracking-tight">Leads · <%= lp.name %></h1>
+        <p class="text-xs text-zinc-500 mt-0.5"><code class="bg-zinc-100 rounded px-1.5 py-0.5"><%= lp.slug %></code> · <%= leads.length %> lead<%= leads.length === 1 ? '' : 's' %></p>
+      </div>
+      <form method="post" action="/admin/logout"><button class="text-sm text-zinc-600 hover:text-zinc-900">Sair</button></form>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8 space-y-8">
+
+    <% if (flash) { %>
+      <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl px-4 py-3 text-sm"><%= flash %></div>
+    <% } %>
+
+    <!-- WEBHOOK -->
+    <section class="bg-white border border-zinc-200 rounded-2xl p-6">
+      <h2 class="text-lg font-semibold mb-1">Webhook para o CRM</h2>
+      <p class="text-sm text-zinc-500 mb-4">A cada novo lead, enviamos um <strong>POST JSON</strong> para esta URL. Deixe em branco para desativar.</p>
+      <form method="post" action="/admin/lps/<%= lp.slug %>/webhook" class="flex flex-col sm:flex-row gap-3">
+        <input
+          name="webhook_url"
+          type="url"
+          value="<%= lp.webhook_url || '' %>"
+          placeholder="https://seu-crm.com/webhook/leads"
+          class="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+        <button class="bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg px-4 py-2 text-sm font-medium">Salvar webhook</button>
+        <button form="wh-test" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-4 py-2 text-sm font-medium">Testar</button>
+      </form>
+      <form id="wh-test" method="post" action="/admin/lps/<%= lp.slug %>/webhook/test" class="hidden"></form>
+      <details class="mt-4 text-xs text-zinc-500">
+        <summary class="cursor-pointer">Ver formato do payload</summary>
+        <pre class="mt-2 bg-zinc-50 border border-zinc-200 rounded-lg p-3 overflow-auto">{
+  "event": "lead.created",
+  "lp": "<%= lp.slug %>",
+  "lp_name": "<%= lp.name %>",
+  "name": "Maria",
+  "phone": "(61) 99999-0000",
+  "message": "",
+  "source": "site",
+  "page_url": "https://...",
+  "created_at": "2026-06-17T12:00:00.000Z"
+}</pre>
+      </details>
+    </section>
+
+    <!-- LEADS -->
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Contatos cadastrados</h2>
+        <% if (leads.length) { %>
+          <a href="/admin/lps/<%= lp.slug %>/leads.csv" class="text-sm rounded-lg border border-zinc-300 px-3 py-1.5 hover:bg-white">Exportar CSV</a>
+        <% } %>
+      </div>
+
+      <% if (!leads.length) { %>
+        <div class="bg-white border border-zinc-200 rounded-2xl p-8 text-center text-sm text-zinc-500">
+          Nenhum lead ainda. Quando alguém enviar o formulário da LP, aparece aqui.
+        </div>
+      <% } else { %>
+        <div class="bg-white border border-zinc-200 rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-zinc-50 text-zinc-500 text-xs uppercase tracking-wide">
+                <tr>
+                  <th class="text-left font-medium px-4 py-3">Data</th>
+                  <th class="text-left font-medium px-4 py-3">Nome</th>
+                  <th class="text-left font-medium px-4 py-3">WhatsApp</th>
+                  <th class="text-left font-medium px-4 py-3">Origem</th>
+                  <th class="text-left font-medium px-4 py-3">Webhook</th>
+                  <th class="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-100">
+                <% leads.forEach(function(l) { %>
+                  <tr class="hover:bg-zinc-50/60">
+                    <td class="px-4 py-3 whitespace-nowrap text-zinc-500"><%= fmtDate(l.created_at) %></td>
+                    <td class="px-4 py-3 font-medium"><%= l.name || '—' %></td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                      <% if (l.phone) { %>
+                        <a href="https://wa.me/55<%= digits(l.phone) %>" target="_blank" rel="noopener" class="text-emerald-700 hover:underline"><%= l.phone %></a>
+                      <% } else { %>—<% } %>
+                    </td>
+                    <td class="px-4 py-3 text-zinc-500"><%= l.source || '—' %></td>
+                    <td class="px-4 py-3 whitespace-nowrap <%= statusClass(l.webhook_status) %>"><%= l.webhook_status || '—' %></td>
+                    <td class="px-4 py-3 text-right">
+                      <form method="post" action="/admin/lps/<%= lp.slug %>/leads/<%= l.id %>/delete" onsubmit="return confirm('Remover este lead?')">
+                        <button class="text-xs text-red-600 hover:text-red-800">Excluir</button>
+                      </form>
+                    </td>
+                  </tr>
+                  <% if (l.message) { %>
+                    <tr class="bg-zinc-50/40"><td></td><td colspan="5" class="px-4 pb-3 pt-0 text-zinc-600 text-xs">“<%= l.message %>”</td></tr>
+                  <% } %>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% } %>
+    </section>
+
+  </main>
+</body>
+</html>

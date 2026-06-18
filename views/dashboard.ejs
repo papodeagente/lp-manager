@@ -110,6 +110,10 @@
               <% } %>
             </div>
             <div class="flex items-center gap-2 shrink-0">
+              <a href="/admin/lps/<%= lp.slug %>/leads"
+                class="text-sm rounded-lg border border-zinc-300 px-3 py-1.5 hover:bg-zinc-50">
+                Leads<% if (lp.leads_count) { %> <span class="ml-1 inline-flex items-center justify-center rounded-full bg-zinc-900 text-white text-xs px-1.5"><%= lp.leads_count %></span><% } %>
+              </a>
               <a href="/p/<%= lp.slug %>/" target="_blank" rel="noopener"
                 class="text-sm rounded-lg border border-zinc-300 px-3 py-1.5 hover:bg-zinc-50">
                 Preview

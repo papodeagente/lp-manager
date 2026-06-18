@@ -51,6 +51,75 @@ const stmts = {
   delete: db.prepare('DELETE FROM lps WHERE slug = ?'),
 };
 
+// ── Leads + webhook por LP ───────────────────────────────────────────────────
+// Migração idempotente: adiciona a coluna de webhook se ainda não existir.
+try { db.exec('ALTER TABLE lps ADD COLUMN webhook_url TEXT'); } catch (_) {}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL,
+    name TEXT,
+    phone TEXT,
+    message TEXT,
+    source TEXT,
+    page_url TEXT,
+    user_agent TEXT,
+    ip TEXT,
+    webhook_status TEXT,
+    created_at INTEGER NOT NULL
+  );
+`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_leads_slug ON leads(slug, created_at)');
+
+const leadStmts = {
+  insert: db.prepare(`INSERT INTO leads (slug, name, phone, message, source, page_url, user_agent, ip, webhook_status, created_at)
+    VALUES (@slug, @name, @phone, @message, @source, @page_url, @user_agent, @ip, @webhook_status, @created_at)`),
+  listBySlug: db.prepare('SELECT * FROM leads WHERE slug = ? ORDER BY created_at DESC LIMIT 2000'),
+  countBySlug: db.prepare('SELECT COUNT(*) AS n FROM leads WHERE slug = ?'),
+  setStatus: db.prepare('UPDATE leads SET webhook_status = ? WHERE id = ?'),
+  delete: db.prepare('DELETE FROM leads WHERE id = ? AND slug = ?'),
+};
+const setWebhookUrl = db.prepare('UPDATE lps SET webhook_url = ? WHERE slug = ?');
+
+// Dispara o webhook do CRM (POST JSON). Retorna um status curto pra log/UI.
+async function fireWebhook(lp, lead) {
+  if (!lp.webhook_url) return 'sem-webhook';
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch(lp.webhook_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': 'lp-manager-webhook/1' },
+      body: JSON.stringify({
+        event: 'lead.created',
+        lp: lp.slug,
+        lp_name: lp.name,
+        name: lead.name,
+        phone: lead.phone,
+        message: lead.message,
+        source: lead.source,
+        page_url: lead.page_url,
+        created_at: new Date(lead.created_at).toISOString(),
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    return r.ok ? `ok ${r.status}` : `http ${r.status}`;
+  } catch (e) {
+    return `erro: ${(e.message || 'falha').slice(0, 50)}`;
+  }
+}
+
+// Rate-limit simples por IP (anti-spam): máx 8 leads/min.
+const leadRate = new Map();
+function leadRateOk(ip) {
+  const now = Date.now();
+  const arr = (leadRate.get(ip) || []).filter((t) => now - t < 60000);
+  if (arr.length >= 8) { leadRate.set(ip, arr); return false; }
+  arr.push(now); leadRate.set(ip, arr); return true;
+}
+
 const app = express();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -120,7 +189,8 @@ function listLPs() {
       try { walk(dir); } catch (_) {}
     }
     const htmls = exists ? listHtmls(dir) : [];
-    return { ...lp, files, size, has_files: exists, htmls };
+    const leads_count = leadStmts.countBySlug.get(lp.slug).n;
+    return { ...lp, files, size, has_files: exists, htmls, leads_count };
   });
 }
 
@@ -500,6 +570,46 @@ function scheduleCoolifyRestart() {
   }, 2000);
 }
 
+// ── Captura de lead (chamado pelo form da LP, mesma origem) ─────────────────
+app.post('/api/lead', async (req, res) => {
+  try {
+    const host = (req.hostname || '').toLowerCase();
+    const apex = host.startsWith('www.') ? host.slice(4) : host;
+    const lp = isAdminHost(req)
+      ? (req.body.slug ? stmts.get.get(slugify(req.body.slug)) : null)
+      : stmts.getByDomain.get(apex);
+    if (!lp) return res.status(404).json({ ok: false, error: 'lp-not-found' });
+
+    if (req.body.company) return res.json({ ok: true }); // honeypot: bot preencheu campo oculto
+    const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
+    if (!leadRateOk(ip)) return res.status(429).json({ ok: false, error: 'rate-limit' });
+
+    const name = String(req.body.name || '').trim().slice(0, 120);
+    const phone = String(req.body.phone || '').trim().slice(0, 40);
+    const message = String(req.body.message || '').trim().slice(0, 1000);
+    if (!name && !phone) return res.status(400).json({ ok: false, error: 'empty' });
+
+    const lead = {
+      slug: lp.slug, name, phone, message,
+      source: String(req.body.source || 'site').slice(0, 60),
+      page_url: String(req.body.page_url || req.headers.referer || '').slice(0, 300),
+      user_agent: String(req.headers['user-agent'] || '').slice(0, 300),
+      ip, webhook_status: null, created_at: Date.now(),
+    };
+    const info = leadStmts.insert.run(lead);
+    res.json({ ok: true, id: info.lastInsertRowid });
+
+    if (lp.webhook_url) {
+      fireWebhook(lp, lead).then((status) => {
+        try { leadStmts.setStatus.run(status, info.lastInsertRowid); } catch (_) {}
+      });
+    }
+  } catch (e) {
+    console.error('[lead]', e.message);
+    res.status(500).json({ ok: false, error: 'server' });
+  }
+});
+
 app.use((req, res, next) => {
   const host = (req.hostname || '').toLowerCase();
 
@@ -742,6 +852,67 @@ app.post('/admin/lps/:slug/delete', requireAuth, async (req, res) => {
   stmts.delete.run(lp.slug);
   req.session.flash = `LP "${lp.slug}" deletada`;
   res.redirect('/admin');
+});
+
+// ── Admin: leads + webhook ───────────────────────────────────────────────────
+app.get('/admin/lps/:slug/leads', requireAuth, (req, res) => {
+  const lp = stmts.get.get(req.params.slug);
+  if (!lp) return res.status(404).send('LP não existe');
+  const leads = leadStmts.listBySlug.all(lp.slug);
+  res.render('leads', { lp, leads, flash: req.session.flash || null });
+  req.session.flash = null;
+});
+
+app.post('/admin/lps/:slug/webhook', requireAuth, (req, res) => {
+  const lp = stmts.get.get(req.params.slug);
+  if (!lp) return res.status(404).send('LP não existe');
+  const url = (req.body.webhook_url || '').trim();
+  if (url && !/^https?:\/\//i.test(url)) {
+    req.session.flash = 'URL inválida — use http:// ou https://';
+    return res.redirect(`/admin/lps/${lp.slug}/leads`);
+  }
+  setWebhookUrl.run(url || null, lp.slug);
+  req.session.flash = url ? 'Webhook salvo.' : 'Webhook removido.';
+  res.redirect(`/admin/lps/${lp.slug}/leads`);
+});
+
+app.post('/admin/lps/:slug/webhook/test', requireAuth, async (req, res) => {
+  const lp = stmts.get.get(req.params.slug);
+  if (!lp) return res.status(404).send('LP não existe');
+  if (!lp.webhook_url) {
+    req.session.flash = 'Configure e salve o webhook antes de testar.';
+    return res.redirect(`/admin/lps/${lp.slug}/leads`);
+  }
+  const status = await fireWebhook(lp, {
+    name: 'Lead de teste', phone: '(61) 90000-0000',
+    message: 'Disparo de teste do lp-manager', source: 'teste-webhook',
+    page_url: '', created_at: Date.now(),
+  });
+  req.session.flash = `Teste enviado ao webhook → ${status}`;
+  res.redirect(`/admin/lps/${lp.slug}/leads`);
+});
+
+app.post('/admin/lps/:slug/leads/:id/delete', requireAuth, (req, res) => {
+  const lp = stmts.get.get(req.params.slug);
+  if (!lp) return res.status(404).send('LP não existe');
+  leadStmts.delete.run(parseInt(req.params.id, 10) || 0, lp.slug);
+  req.session.flash = 'Lead removido.';
+  res.redirect(`/admin/lps/${lp.slug}/leads`);
+});
+
+app.get('/admin/lps/:slug/leads.csv', requireAuth, (req, res) => {
+  const lp = stmts.get.get(req.params.slug);
+  if (!lp) return res.status(404).send('LP não existe');
+  const leads = leadStmts.listBySlug.all(lp.slug);
+  const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const head = ['data', 'nome', 'telefone', 'mensagem', 'origem', 'pagina', 'webhook'];
+  const lines = leads.map((l) => [
+    new Date(l.created_at).toISOString(), l.name, l.phone, l.message, l.source, l.page_url, l.webhook_status,
+  ].map(esc).join(','));
+  const csv = '﻿' + head.map(esc).join(',') + '\n' + lines.join('\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="leads-${lp.slug}.csv"`);
+  res.send(csv);
 });
 
 app.use('/p/:slug', requireAuth, (req, res, next) => {
