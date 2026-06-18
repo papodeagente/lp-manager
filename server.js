@@ -83,6 +83,40 @@ const leadStmts = {
 const setWebhookUrl = db.prepare('UPDATE lps SET webhook_url = ? WHERE slug = ?');
 
 // Dispara o webhook do CRM (POST JSON). Retorna um status curto pra log/UI.
+// Normaliza telefone BR pra formatos que CRMs entendem (limpo, com DDI 55).
+function normalizePhone(raw) {
+  let d = String(raw || '').replace(/\D/g, '').replace(/^0+/, '');
+  if (!d) return { full: '', e164: '', local: '' };
+  let full;
+  if (d.startsWith('55') && d.length >= 12) full = d;            // já tem DDI
+  else if (d.length === 10 || d.length === 11) full = '55' + d;  // DDD + número
+  else full = d;
+  const local = full.startsWith('55') ? full.slice(2) : full;
+  return { full, e164: '+' + full, local };
+}
+
+function webhookPayload(lp, lead) {
+  const ph = normalizePhone(lead.phone);
+  return {
+    event: 'lead.created',
+    lp: lp.slug,
+    lp_name: lp.name,
+    name: lead.name,
+    // telefone em vários formatos pra mapear em qualquer CRM:
+    phone: ph.full,               // 5561999990000 (limpo, com DDI)
+    phone_e164: ph.e164,          // +5561999990000
+    phone_local: ph.local,        // 61999990000
+    phone_formatted: lead.phone,  // (61) 99999-0000 (exibição)
+    email: '',
+    message: lead.message,
+    source: lead.source,
+    page_url: lead.page_url,
+    created_at: new Date(lead.created_at).toISOString(),
+    // objeto aninhado pra automações que esperam contact.*
+    contact: { name: lead.name, phone: ph.full, phone_e164: ph.e164, email: '' },
+  };
+}
+
 async function fireWebhook(lp, lead) {
   if (!lp.webhook_url) return 'sem-webhook';
   try {
@@ -91,17 +125,7 @@ async function fireWebhook(lp, lead) {
     const r = await fetch(lp.webhook_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'User-Agent': 'lp-manager-webhook/1' },
-      body: JSON.stringify({
-        event: 'lead.created',
-        lp: lp.slug,
-        lp_name: lp.name,
-        name: lead.name,
-        phone: lead.phone,
-        message: lead.message,
-        source: lead.source,
-        page_url: lead.page_url,
-        created_at: new Date(lead.created_at).toISOString(),
-      }),
+      body: JSON.stringify(webhookPayload(lp, lead)),
       signal: ctrl.signal,
     });
     clearTimeout(t);
