@@ -571,6 +571,16 @@ function scheduleCoolifyRestart() {
 }
 
 // ── Captura de lead (chamado pelo form da LP, mesma origem) ─────────────────
+// Abrir no navegador (GET) só explica: este endpoint recebe POST do formulário.
+app.get('/api/lead', (req, res) => {
+  res.type('text/plain').send(
+    'Este endereço recebe os envios do formulário da landing page (método POST).\n' +
+    'Ele não é uma página para abrir no navegador.\n\n' +
+    'Para VER os leads cadastrados, acesse o painel admin:\n' +
+    'http://op9b10kp8njuotvz5x9d4y6a.187.127.6.135.sslip.io/admin'
+  );
+});
+
 app.post('/api/lead', async (req, res) => {
   try {
     const host = (req.hostname || '').toLowerCase();
