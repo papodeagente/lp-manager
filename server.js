@@ -18,6 +18,8 @@ const SITES_DIR = path.join(DATA_DIR, 'sites');
 const DB_PATH = path.join(DATA_DIR, 'lps.db');
 
 const ADMIN_HOST = process.env.ADMIN_HOST || 'admin.lps.entur.com.br';
+// Suporta múltiplos hosts admin (separados por vírgula).
+const ADMIN_HOSTS = ADMIN_HOST.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 
@@ -170,7 +172,7 @@ const upload = multer({
 
 function isAdminHost(req) {
   const host = (req.hostname || '').toLowerCase();
-  return host === ADMIN_HOST.toLowerCase() || host === 'localhost' || host.endsWith('.sslip.io');
+  return ADMIN_HOSTS.includes(host) || host === 'localhost' || host.endsWith('.sslip.io');
 }
 
 function requireAuth(req, res, next) {
@@ -819,7 +821,7 @@ app.post('/admin/lps/:slug/domain', requireAuth, async (req, res) => {
     if (!lp) return res.status(404).send('LP não existe');
     const newDomain = (req.body.domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '') || null;
 
-    if (newDomain && newDomain === ADMIN_HOST.toLowerCase()) {
+    if (newDomain && ADMIN_HOSTS.includes(newDomain)) {
       return res.status(400).send('Esse domínio é reservado pro admin');
     }
     if (newDomain) {
