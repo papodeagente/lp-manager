@@ -646,6 +646,17 @@ app.post('/api/lead', async (req, res) => {
   }
 });
 
+// Resolve URL limpa (sem extensão): /obrigado -> obrigado.html ; /x/ -> x/index.html
+function resolveFile(fp) {
+  try {
+    if (fs.existsSync(fp) && fs.statSync(fp).isFile()) return fp;
+    for (const c of [fp + '.html', path.join(fp, 'index.html')]) {
+      if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
+    }
+  } catch {}
+  return null;
+}
+
 app.use((req, res, next) => {
   const host = (req.hostname || '').toLowerCase();
 
@@ -658,15 +669,16 @@ app.use((req, res, next) => {
   }
 
   const cleanPath = req.path === '/' ? `/${lp.index_file}` : req.path;
-  const filePath = path.join(siteDir(lp.slug), cleanPath);
   const dir = siteDir(lp.slug);
+  const filePath = path.join(dir, cleanPath);
   if (!filePath.startsWith(dir + path.sep) && filePath !== path.join(dir, lp.index_file)) {
     return res.status(403).send('forbidden');
   }
-  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+  const target = resolveFile(filePath);
+  if (!target) {
     return res.status(404).type('text/plain').send('Not found');
   }
-  return serveStatic(req, res, lp, filePath);
+  return serveStatic(req, res, lp, target);
 });
 
 app.get('/', (req, res) => res.redirect('/admin'));
@@ -955,13 +967,14 @@ app.use('/p/:slug', requireAuth, (req, res, next) => {
   const lp = stmts.get.get(req.params.slug);
   if (!lp) return res.status(404).send('LP não existe');
   const rel = req.path === '/' ? `/${lp.index_file}` : req.path;
-  const fp = path.join(siteDir(lp.slug), rel);
   const dir = siteDir(lp.slug);
+  const fp = path.join(dir, rel);
   if (!fp.startsWith(dir + path.sep) && fp !== path.join(dir, lp.index_file)) {
     return res.status(403).send('forbidden');
   }
-  if (!fs.existsSync(fp) || fs.statSync(fp).isDirectory()) return res.status(404).send('not found');
-  return serveStatic(req, res, lp, fp);
+  const target = resolveFile(fp);
+  if (!target) return res.status(404).send('not found');
+  return serveStatic(req, res, lp, target);
 });
 
 app.get('/healthz', (req, res) => res.json({ ok: true, lps: stmts.list.all().length }));
