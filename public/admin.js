@@ -283,6 +283,28 @@
     });
   });
 
+  // gaveta aberta quando a tela vira de computador (iPad girado, janela alargada): fecha
+  var gaveta = d.getElementById('lateral');
+  if (gaveta && window.matchMedia) {
+    var pc = window.matchMedia('(min-width:1024px)');
+    var fecha = function () {
+      if (!pc.matches) return;
+      gaveta.classList.remove('aberta');
+      try { if (gaveta.matches(':popover-open')) gaveta.hidePopover(); } catch (e) {}
+    };
+    if (pc.addEventListener) pc.addEventListener('change', fecha); else if (pc.addListener) pc.addListener(fecha);
+  }
+  // o ::backdrop do popover não segura o toque: o "click" do toque que fecha o menu chegaria
+  // ao que está embaixo (a lixeira de um lead, uma aba). Esse click é descartado.
+  if (gaveta) {
+    var fechouEm = 0;
+    gaveta.addEventListener('beforetoggle', function (e) { if (e.newState === 'closed') fechouEm = Date.now(); });
+    d.addEventListener('click', function (e) {
+      if (fechouEm && Date.now() - fechouEm < 700 && !gaveta.contains(e.target)) { e.preventDefault(); e.stopPropagation(); }
+      fechouEm = 0;
+    }, true);
+  }
+
   // aba ativa sempre visível quando as abas rolam de lado (celular)
   d.querySelectorAll('.abas [aria-current="page"]').forEach(function (a) {
     var abas = a.parentNode;

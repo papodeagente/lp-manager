@@ -6,7 +6,7 @@
   const c = JSON.parse(chartJson);
   const unidade = period.hourly ? 'hora' : 'dia';
 %>
-<%- include('partials/period', { base: '/admin/paginas/' + page.id, resumo: antesDaMedicao ? 'Acessos medidos desde ' + fmt.date(comeco) + '.' : (status.last ? 'Último acesso ' + fmt.rel(status.last) : '') }) %>
+<%- include('partials/period', { base: '/admin/paginas/' + page.id, resumo: antesDaMedicao ? 'Acessos medidos desde ' + fmt.date(comeco) + '.' : '' }) %>
 
 <dl class="kpis">
   <%- include('partials/kpi', { rotulo: 'Acessos', valor: fmt.int(k.visits), d: fmt.delta(k.visits, kp.visits), sub: fmt.int(k.visitors) + ' pessoas · ' + fmt.int(k.views) + ' visualizações' }) %>

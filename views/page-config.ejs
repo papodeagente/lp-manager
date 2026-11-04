@@ -12,7 +12,8 @@
   const motivo = function (st) {
     if (!st) return '';
     if (/^http \d+/.test(st)) return 'o CRM respondeu com erro (' + st + ')';
-    if (/tempo esgotado/.test(st)) return 'o CRM não respondeu a tempo';
+    if (/tempo esgotado|aborted|timeout/i.test(st)) return 'o CRM não respondeu a tempo';
+    if (/endereço inválido|use um endereço|não existe/.test(st)) return 'o endereço não é válido (' + st.replace(/^erro: /, '') + ')';
     if (/rede interna/.test(st)) return 'endereço de rede interna não é aceito';
     return 'não foi possível conectar ao CRM';
   };
