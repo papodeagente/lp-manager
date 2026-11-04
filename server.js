@@ -11,13 +11,13 @@ import { fileURLToPath } from 'node:url';
 import { openDb, once } from './lib/db.js';
 import {
   SqliteStore, verifyPassword, isPasswordHash, normEmail, loginAttempt, loginSucceeded, sleep,
-  sameOriginOnly, tokenMatches, safeNext,
+  sameOriginOnly, tokenMatches, safeNext, deviceToken, deviceKnown, DEVICE_MAX_AGE,
 } from './lib/auth.js';
-import { webhookProblem } from './lib/webhook.js';
+import { webhookProblem, postJson } from './lib/webhook.js';
 import { makePages, pathOfUrl } from './lib/pages.js';
 import {
   makeTracking, ensureVisitor, visitorOf, isBot, eventRateOk, injectTracker, trackerVersion,
-  leadAttributionFromUrl, deviceOf, CHANNELS,
+  leadAttributionFromUrl, deviceOf, parseCookies, CHANNELS,
 } from './lib/tracking.js';
 import { makeStats } from './lib/stats.js';
 import * as fmt from './lib/format.js';
@@ -66,10 +66,10 @@ const stmts = {
 const leadStmts = {
   insert: db.prepare(`INSERT INTO leads (slug, name, phone, message, source, page_url, user_agent, ip, webhook_status, created_at,
       page_id, page_path, visit_id, visitor_id, utm_source, utm_medium, utm_campaign, utm_term, utm_content, click_type, click_id,
-      channel, referrer, landing_page, device, first_source, first_medium, first_campaign, first_seen)
+      channel, referrer, landing_page, device, first_source, first_medium, first_campaign, first_seen, test)
     VALUES (@slug, @name, @phone, @message, @source, @page_url, @user_agent, @ip, @webhook_status, @created_at,
       @page_id, @page_path, @visit_id, @visitor_id, @utm_source, @utm_medium, @utm_campaign, @utm_term, @utm_content, @click_type, @click_id,
-      @channel, @referrer, @landing_page, @device, @first_source, @first_medium, @first_campaign, @first_seen)`),
+      @channel, @referrer, @landing_page, @device, @first_source, @first_medium, @first_campaign, @first_seen, @test)`),
   countBySlug: db.prepare('SELECT COUNT(*) AS n FROM leads WHERE slug = ?'),
   setStatus: db.prepare('UPDATE leads SET webhook_status = ? WHERE id = ?'),
 };
@@ -149,19 +149,8 @@ function webhookFor(lp, page) {
 async function fireWebhook(lp, lead, page, url = webhookFor(lp, page)) {
   if (!url) return 'sem-webhook';
   try {
-    const problem = await webhookProblem(url);
-    if (problem) return `erro: ${problem}`;
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 8000);
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'User-Agent': 'lp-manager-webhook/1' },
-      body: JSON.stringify(webhookPayload(lp, lead, page)),
-      signal: ctrl.signal,
-      redirect: 'manual',
-    });
-    clearTimeout(t);
-    return r.ok ? `ok ${r.status}` : `http ${r.status}`;
+    const status = await postJson(url, webhookPayload(lp, lead, page));
+    return status >= 200 && status < 300 ? `ok ${status}` : `http ${status}`;
   } catch (e) {
     return `erro: ${(e.message || 'falha').slice(0, 50)}`;
   }
@@ -763,10 +752,14 @@ app.post('/api/lead', ah(async (req, res) => {
       user_agent: String(req.headers['user-agent'] || '').slice(0, 300),
       ip, webhook_status: null, created_at: now,
       ...Object.fromEntries(LEAD_FIELDS.map((k) => [k, null])),
+      test: 0,
     };
     try {
       Object.assign(lead, tracking.attributeLead(lp, visitorOf(req), pageUrl, now));
       if (!lead.device) lead.device = deviceOf(lead.user_agent, 0);
+      let lpmParam = null;
+      try { lpmParam = new URL(pageUrl).searchParams.get('lpm'); } catch (_) {}
+      if (lpmParam === 'test' || lpmParam === 'off' || parseCookies(req.headers.cookie)._lpm_off === '1') lead.test = 1;
     } catch (e) { console.error('[lead:origem]', e.message); }
     const info = leadStmts.insert.run(lead);
     res.json({ ok: true, id: info.lastInsertRowid });
@@ -884,10 +877,13 @@ app.post('/admin/login', ah(async (req, res) => {
     render(req, res, 'login', { title: 'Entrar', error, email, next, noUsers: userQ.count.get().n === 0 });
   };
   try {
-    const tentativa = loginAttempt(ip, email || '-');
+    const conhecido = !!email && deviceKnown(SESSION_SECRET, parseCookies(req.headers.cookie).lpm_ap, email);
+    const tentativa = loginAttempt(ip, email || '-', conhecido);
     if (!tentativa.ok) {
-      if (tentativa.firstBlock) audit(req, 'login_bloqueado', email, null);
-      return fail(429, 'Muitas tentativas seguidas. Espere 15 minutos e tente de novo.');
+      if (tentativa.firstBlock) audit(req, 'login_bloqueado', tentativa.cause === 'ip' ? 'muitas tentativas deste IP' : email, null);
+      return fail(429, tentativa.cause === 'fila'
+        ? 'Muitas tentativas para este e-mail agora. Espere um minuto e tente de novo.'
+        : 'Muitas tentativas seguidas. Espere 15 minutos e tente de novo.');
     }
     if (tentativa.delayMs) await sleep(tentativa.delayMs);
     const user = email ? userQ.byEmail.get(email) : null;
@@ -897,6 +893,9 @@ app.post('/admin/login', ah(async (req, res) => {
       return fail(200, 'E-mail ou senha incorretos.');
     }
     loginSucceeded(ip, email, tentativa.stamp);
+    res.cookie('lpm_ap', deviceToken(SESSION_SECRET, email), {
+      httpOnly: true, sameSite: 'lax', secure: req.secure, path: '/admin', maxAge: DEVICE_MAX_AGE * 1000,
+    });
     req.session.regenerate((err) => {
       if (err) return fail(500, 'Não deu para abrir a sessão. Tente de novo.');
       req.session.uid = user.id;
@@ -921,7 +920,12 @@ app.post('/admin/logout', (req, res) => {
 
 // ── Site e arquivos (super admin) ────────────────────────────────────────────
 app.get('/admin/site', requireSuper, (req, res) => {
-  const lps = listLPs().map((lp) => ({ ...lp, pages: pages.list(lp.slug), status: stats.status(lp.slug) }));
+  const draft = req.session.siteDraft || null;
+  req.session.siteDraft = null;
+  const lps = listLPs().map((lp) => ({
+    ...lp, pages: pages.list(lp.slug), status: stats.status(lp.slug),
+    webhook_field: draft && draft.slug === lp.slug ? draft.webhook_url : (lp.webhook_url || ''),
+  }));
   render(req, res, 'site', { title: 'Site e arquivos', lps, ...takeFlash(req) });
 });
 
@@ -1160,6 +1164,7 @@ app.post('/admin/lps/:slug/webhook/test', requireSuper, ah(async (req, res) => {
   }
   const status = await fireWebhook(lp, testLead(), null, url);
   audit(req, 'webhook_testado', `${lp.slug} (site) → ${status}`);
+  if (url !== lp.webhook_url) req.session.siteDraft = { slug: lp.slug, webhook_url: url };
   req.session[status.startsWith('ok') ? 'flash' : 'flashWarn'] = `Teste para ${url}: ${status.startsWith('ok') ? 'recebido' : 'falhou'} (${status}).`
     + (url !== lp.webhook_url ? ' O endereço ainda não foi salvo.' : '');
   res.redirect('/admin/site');
@@ -1198,6 +1203,10 @@ app.use('/p/:slug', (req, res, next) => {
       serveStatic(req, res, lp, target);
     });
   }
+  // como imagem, fonte ou CSS a CSP é ignorada e a prévia carrega normal; aberto direto
+  // como documento (svg, xhtml, shtml, xml), o arquivo roda isolado e não pode ser emoldurado
+  res.set('Content-Security-Policy', "sandbox; frame-ancestors 'none'");
+  res.set('X-Frame-Options', 'DENY');
   res.set('Access-Control-Allow-Origin', '*');
   return serveStatic(req, res, lp, target);
 });
@@ -1208,14 +1217,17 @@ registerAdmin(app, {
 });
 
 app.use((err, req, res, next) => {
-  console.error('[erro]', req.method, req.path, err && err.stack ? err.stack : err);
+  const st = err && (err.status || err.statusCode);
+  const status = err && err.code === 'LIMIT_FILE_SIZE' ? 413 : (st >= 400 && st < 500 ? st : 500);
+  if (status >= 500) console.error('[erro]', req.method, req.path, err && err.stack ? err.stack : err);
   if (res.headersSent) return next(err);
-  const status = err && err.code === 'LIMIT_FILE_SIZE' ? 413 : 500;
   res.status(status);
   if (isAdminHost(req) && req.accepts('html')) {
-    return render(req, res, 'error', { title: 'Algo deu errado', message: status === 413 ? 'O arquivo passa do limite de 200 MB.' : 'Não deu para concluir. Tente de novo; se repetir, avise o suporte.' });
+    const message = status === 413 ? 'O arquivo passa do limite permitido.'
+      : status < 500 ? 'Pedido inválido. Volte e tente de novo.' : 'Não deu para concluir. Tente de novo; se repetir, avise o suporte.';
+    return render(req, res, 'error', { title: status < 500 ? 'Pedido inválido' : 'Algo deu errado', message });
   }
-  res.type('text/plain').send('Erro');
+  res.type('text/plain').send(status < 500 ? 'Pedido inválido' : 'Erro');
 });
 
 process.on('unhandledRejection', (e) => console.error('[promessa sem tratamento]', e && e.stack ? e.stack : e));
@@ -1234,9 +1246,13 @@ function seedSuperAdmin() {
   const now = Date.now();
   const cur = userQ.byEmail.get(SUPERADMIN_EMAIL);
   const name = SUPERADMIN_NAME || SUPERADMIN_EMAIL.split('@')[0].replace(/^./, (c) => c.toUpperCase());
+  const marcaReset = () => db.prepare("INSERT INTO meta (key, value) VALUES ('superadmin_reset_hash', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run(SUPERADMIN_PASSWORD_HASH);
   if (!cur) {
     db.prepare(`INSERT INTO users (email, name, password_hash, role, active, must_change_password, password_changed_at, created_at, updated_at)
       VALUES (?, ?, ?, 'super', 1, 0, ?, ?, ?)`).run(SUPERADMIN_EMAIL, name, SUPERADMIN_PASSWORD_HASH, now, now, now);
+    // criado com este hash: uma variável de redefinição esquecida ligada não desfaz a próxima troca de senha
+    if (process.env.SUPERADMIN_PASSWORD_RESET === '1') marcaReset();
     console.log(`[auth] super admin criado: ${SUPERADMIN_EMAIL}`);
     return;
   }
@@ -1246,15 +1262,19 @@ function seedSuperAdmin() {
   // a redefinição vale uma vez para cada hash: esquecida ligada, não desfaz a troca de senha seguinte
   if (process.env.SUPERADMIN_PASSWORD_RESET === '1') {
     const applied = db.prepare("SELECT value FROM meta WHERE key = 'superadmin_reset_hash'").get();
-    if ((!applied || applied.value !== SUPERADMIN_PASSWORD_HASH) && cur.password_hash !== SUPERADMIN_PASSWORD_HASH) {
+    if (cur.password_hash === SUPERADMIN_PASSWORD_HASH) {
+      // nada a fazer: a senha já é a da variável
+    } else if (applied && applied.value === SUPERADMIN_PASSWORD_HASH) {
+      console.warn('[auth] SUPERADMIN_PASSWORD_RESET ignorado: este hash já foi usado. Para redefinir de novo, gere outro '
+        + 'com node scripts/hash-password.js (a mesma senha gera um hash diferente) e desligue a variável depois.');
+    } else {
       db.prepare('UPDATE users SET password_hash = ?, password_changed_at = ?, must_change_password = 0, updated_at = ? WHERE id = ?')
         .run(SUPERADMIN_PASSWORD_HASH, now, now, cur.id);
       sessionStore.endUser(cur.id);
       auditInsert.run(null, 'sistema', 'senha_redefinida', `${SUPERADMIN_EMAIL} pela variável SUPERADMIN_PASSWORD_RESET`, null, now);
       console.log('[auth] senha do super admin redefinida pela variável de ambiente (desligue SUPERADMIN_PASSWORD_RESET)');
     }
-    db.prepare("INSERT INTO meta (key, value) VALUES ('superadmin_reset_hash', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
-      .run(SUPERADMIN_PASSWORD_HASH);
+    marcaReset();
   }
 }
 

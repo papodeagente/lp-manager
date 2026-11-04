@@ -14,7 +14,7 @@
     </div>
     <% if (user.role === 'super') { %>
       <label>Webhook dos leads desta página
-        <input type="url" name="webhook_url" value="<%= page.webhook_url || '' %>" placeholder="<%= lp.webhook_url ? 'Vazio: usa o webhook do site' : 'https://seu-crm.com/webhook' %>">
+        <input type="url" name="webhook_url" value="<%= draft ? draft.webhook_url : (page.webhook_url || '') %>" placeholder="<%= lp.webhook_url ? 'Vazio: usa o webhook do site' : 'https://seu-crm.com/webhook' %>">
         <span class="ajuda">Para mandar os leads desta página para outro funil do CRM. Vazio, vale o webhook do site. "Testar" envia um lead de teste para o endereço digitado, sem salvar.</span>
       </label>
     <% } else { %>

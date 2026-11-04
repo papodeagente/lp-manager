@@ -17,7 +17,7 @@ Node 22 + Express + SQLite (`better-sqlite3`) + EJS, sem etapa de build. Dados e
 | `SUPERADMIN_EMAIL` | e-mail do dono do painel; criado (ou reativado como super admin) a cada boot |
 | `SUPERADMIN_PASSWORD_HASH` | hash da senha do dono, nunca a senha: `node scripts/hash-password.js` |
 | `SUPERADMIN_NAME` | opcional; nome exibido (padrão: a parte do e-mail antes do @) |
-| `SUPERADMIN_PASSWORD_RESET` | `1` faz o boot regravar a senha do dono com o hash acima (recuperação) |
+| `SUPERADMIN_PASSWORD_RESET` | `1` faz o boot regravar a senha do dono com o hash acima (recuperação). Vale uma vez por hash: para recuperar de novo, gere outro hash (a mesma senha gera outro). Desligue depois de usar |
 | `DEPLOY_TOKEN` | token para publicar ZIP por linha de comando (`Authorization: Bearer`) |
 | `PANEL_TITLE` | nome no topo do painel (padrão: `Glazi Melo`) |
 | `COOLIFY_HOST`, `COOLIFY_TOKEN`, `COOLIFY_APP_UUID` | para o painel incluir/remover domínios no Coolify |
@@ -36,8 +36,12 @@ node scripts/hash-password.js        # digite a senha e aperte Ctrl+D
 
 Usuário novo recebe uma senha provisória (mostrada uma vez) e troca no primeiro acesso.
 Desativar, excluir ou trocar a senha encerra as sessões da pessoa na hora. O painel não deixa
-ficar sem super admin ativo. Senhas com scrypt; 8 erros por e-mail (ou 30 por IP) em 15 minutos
-bloqueiam o login pelo resto da janela. Todo POST do painel precisa vir da própria origem.
+ficar sem super admin ativo. Senhas com scrypt. Tentativas erradas (contadas antes de conferir a
+senha) bloqueiam por 15 minutos o par e-mail + IP depois de 8 erros e o IP depois de 30. Pelo e-mail
+sozinho, depois de 8 erros, aparelho desconhecido entra numa fila (uma tentativa por vez, com intervalo
+de até 30 s); o aparelho onde a pessoa já entrou (cookie assinado `lpm_ap`) fica fora da fila. Todo
+POST do painel precisa vir da própria origem. Webhook só para endereço público (nada de rede interna),
+sem seguir redirecionamento; quem muda ou testa webhook é o super admin.
 
 ## Páginas
 

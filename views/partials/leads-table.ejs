@@ -10,7 +10,7 @@
           <% leads.forEach(function (l) { const wa = fmt.waLink(l.phone); const camp = [l.utm_campaign, l.utm_term].filter(Boolean).join(' · '); const st = l.webhook_status; %>
             <tr>
               <td data-r="Data" class="num"><span><%= fmt.datetime(l.created_at) %></span></td>
-              <td data-r="Nome" class="quem"><b><a href="/admin/leads/<%= l.id %>"><%= l.name || 'Sem nome' %></a></b><% if (wa) { %><a href="<%= wa %>" target="_blank" rel="noopener"><%= l.phone %></a><% } else { %><small><%= l.phone || '' %></small><% } %><% if (l.message) { %><br><small>“<%= l.message %>”</small><% } %></td>
+              <td data-r="Nome" class="quem"><b><a href="/admin/leads/<%= l.id %>"><%= l.name || 'Sem nome' %></a><% if (l.test) { %> <span class="selo alerta">Teste</span><% } %></b><% if (wa) { %><a href="<%= wa %>" target="_blank" rel="noopener"><%= l.phone %></a><% } else { %><small><%= l.phone || '' %></small><% } %><% if (l.message) { %><br><small>“<%= l.message %>”</small><% } %></td>
               <% if (mostrarPagina) { %><td data-r="Página"><span><%= l.page_name || l.page_path || '-' %></span></td><% } %>
               <td data-r="Origem"><span><%= l.channel ? (CHANNELS[l.channel] || l.channel) : '-' %><% if (l.utm_source && l.utm_source !== '(direct)') { %><br><small><%= l.utm_source %> / <%= l.utm_medium %></small><% } %></span></td>
               <td data-r="Campanha · palavra-chave" class="<%= camp || l.utm_content ? '' : 'vazio-cel' %>"><span><%= camp || '-' %><% if (l.utm_content) { %><br><small><%= l.utm_content %></small><% } %></span></td>

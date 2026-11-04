@@ -23,7 +23,7 @@
     <%- include('partials/kpi', { rotulo: 'Cliques em contato', valor: fmt.int(total.clicks), d: fmt.delta(total.clicks, totalPrev.clicks), sub: total.click_rate != null ? fmt.pct(total.click_rate) + ' dos acessos' : '' }) %>
     <%- include('partials/kpi', { rotulo: 'Tempo médio na página', valor: fmt.dur(total.avg_ms), d: fmt.delta(total.avg_ms, totalPrev.avg_ms), sub: '' }) %>
     <%- include('partials/kpi', { rotulo: 'Conversões', valor: fmt.int(total.conversions), d: fmt.delta(total.conversions, totalPrev.conversions), sub: total.untracked ? fmt.int(total.untracked) + ' sem dados de navegação' : (total.leads !== total.conversions ? fmt.int(total.leads) + ' envios' : '') }) %>
-    <%- include('partials/kpi', { rotulo: 'Taxa de conversão', valor: fmt.pct(total.rate), d: fmt.delta(total.rate, totalPrev.rate), sub: total.untracked ? 'só das visitas medidas' : 'conversões ÷ acessos' }) %>
+    <%- include('partials/kpi', { rotulo: 'Taxa de conversão', valor: fmt.pct(total.rate), d: fmt.delta(total.rate, totalPrev.rate), sub: total.conversions !== total.tracked_conversions ? 'só das visitas medidas no período' : 'conversões ÷ acessos' }) %>
   </dl>
 
   <section class="paginas" aria-label="Páginas">
@@ -34,11 +34,11 @@
           <p class="pag__url"><%= r.page.domain %><%= r.page.path === '/' ? '/' : r.page.path %></p>
         </div>
         <dl class="mini">
-          <% [['Acessos', fmt.int(k.visits), fmt.delta(k.visits, kp.visits)], ['Cliques', fmt.int(k.clicks), fmt.delta(k.clicks, kp.clicks)], ['Tempo médio', fmt.dur(k.avg_ms), null], ['Conversões', fmt.int(k.conversions) + (k.untracked ? '*' : ''), fmt.delta(k.conversions, kp.conversions)], ['Taxa', fmt.pct(k.rate), null], ['Leram até o fim', k.views ? fmt.pct(k.read_end / k.views, 0) : '-', null]].forEach(function (m) { %>
+          <% [['Acessos', fmt.int(k.visits), fmt.delta(k.visits, kp.visits)], ['Cliques', fmt.int(k.clicks), fmt.delta(k.clicks, kp.clicks)], ['Tempo médio', fmt.dur(k.avg_ms), null], ['Conversões', fmt.int(k.conversions) + (k.conversions !== k.tracked_conversions ? '*' : ''), fmt.delta(k.conversions, kp.conversions)], ['Taxa', fmt.pct(k.rate), null], ['Leram até o fim', k.views ? fmt.pct(k.read_end / k.views, 0) : '-', null]].forEach(function (m) { %>
             <div><dt><%= m[0] %></dt><dd><%= m[1] %><% if (m[2] && m[2].dir !== 'flat') { %><span class="delta <%= m[2].dir %>"><%= m[2].text %></span><% } %></dd></div>
           <% }) %>
         </dl>
-        <% if (k.untracked) { %><p class="pequeno">* <%= fmt.int(k.untracked) %> sem dados de navegação (de antes da medição): contam nas conversões, não na taxa.</p><% } %>
+        <% if (k.conversions !== k.tracked_conversions) { %><p class="pequeno">* <%= fmt.int(k.conversions - k.tracked_conversions) %> fora da taxa: sem dados de navegação (de antes da medição) ou de visita que começou antes do período.</p><% } %>
         <footer>
           <a class="btn sec peq" href="/admin/paginas/<%= r.page.id %>">Ver resultados</a>
           <a class="pequeno" href="/admin/paginas/<%= r.page.id %>/leads">Leads desta página</a>

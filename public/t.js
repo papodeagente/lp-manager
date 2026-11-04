@@ -8,9 +8,18 @@
   w.__lpm = 1;
   try {
     var modo = new URLSearchParams(loc.search).get('lpm');
-    if (modo === 'off') localStorage.setItem('lpm_off', '1');
-    else if (modo === 'on') localStorage.removeItem('lpm_off');
-    if (localStorage.getItem('lpm_off') === '1') return;
+    if (modo === 'off') {
+      localStorage.setItem('lpm_off', '1');
+      d.cookie = '_lpm_off=1; path=/; max-age=34128000; samesite=lax';
+    } else if (modo === 'on') {
+      localStorage.removeItem('lpm_off');
+      d.cookie = '_lpm_off=; path=/; max-age=0; samesite=lax';
+    }
+    if (localStorage.getItem('lpm_off') === '1') {
+      // aparelho da equipe: o cookie avisa o servidor para não contar os envios deste aparelho
+      if (d.cookie.indexOf('_lpm_off=1') === -1) d.cookie = '_lpm_off=1; path=/; max-age=34128000; samesite=lax';
+      return;
+    }
   } catch (e) {}
   if (n.webdriver) return;
 

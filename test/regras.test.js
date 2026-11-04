@@ -200,3 +200,29 @@ test('login: bloqueio por e-mail+IP, dono entra de outro IP, rajada não passa d
   loginSucceeded('198.51.100.7', email, outro.stamp);
   assert.equal(loginAttempt('198.51.100.7', email).delayMs, 0);
 });
+
+test('aparelho conhecido: assinatura confere só para o mesmo e-mail e dentro do prazo', async () => {
+  const { deviceToken, deviceKnown } = await import('../lib/auth.js');
+  const t = deviceToken('segredo', 'dono@exemplo.com');
+  assert.equal(deviceKnown('segredo', t, 'dono@exemplo.com'), true);
+  assert.equal(deviceKnown('segredo', t, 'outro@exemplo.com'), false);
+  assert.equal(deviceKnown('outro-segredo', t, 'dono@exemplo.com'), false);
+  assert.equal(deviceKnown('segredo', t.slice(0, -2) + 'xx', 'dono@exemplo.com'), false);
+  assert.equal(deviceKnown('segredo', deviceToken('segredo', 'dono@exemplo.com', Date.now() - 401 * 86400000), 'dono@exemplo.com'), false);
+  assert.equal(deviceKnown('segredo', 'lixo', 'dono@exemplo.com'), false);
+});
+
+test('fila por e-mail: muitos IPs não passam de uma tentativa por vez; aparelho conhecido passa', async () => {
+  const { loginAttempt } = await import('../lib/auth.js');
+  const email = 'fila-' + Date.now() + '@exemplo.com';
+  for (let i = 0; i < 8; i++) assert.equal(loginAttempt('198.18.' + i + '.1', email).ok, true);
+  const aceitas = [];
+  for (let i = 0; i < 40; i++) aceitas.push(loginAttempt('100.70.' + i + '.1', email));
+  const ok = aceitas.filter((a) => a.ok);
+  assert.ok(ok.length <= 6, 'aceitas: ' + ok.length);
+  assert.ok(aceitas.some((a) => !a.ok && a.cause === 'fila'));
+  assert.ok(ok.every((a) => a.delayMs <= 30000));
+  const dono = loginAttempt('100.99.0.1', email, true);
+  assert.equal(dono.ok, true);
+  assert.equal(dono.delayMs, 0);
+});

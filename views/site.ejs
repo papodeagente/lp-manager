@@ -63,7 +63,7 @@
         </form>
         <div class="campos">
           <form class="campos" method="post" action="/admin/lps/<%= lp.slug %>/webhook">
-            <label>Webhook geral dos leads <span class="ajuda">Vale para as páginas sem webhook próprio.</span><input type="url" name="webhook_url" value="<%= lp.webhook_url || '' %>" placeholder="https://seu-crm.com/webhook"></label>
+            <label>Webhook geral dos leads <span class="ajuda">Vale para as páginas sem webhook próprio.</span><input type="url" name="webhook_url" value="<%= lp.webhook_field %>" placeholder="https://seu-crm.com/webhook"></label>
             <div class="acoes"><button class="btn sec peq">Salvar webhook</button><button class="btn sec peq" formaction="/admin/lps/<%= lp.slug %>/webhook/test">Testar</button></div>
           </form>
         </div>
