@@ -1,9 +1,11 @@
 <%- include('partials/top') %>
 <div class="cabeca"><div><h1>Atividade</h1><p>Entradas no painel e alterações, das mais recentes para as mais antigas.</p></div></div>
 <div class="filtros" role="group" aria-label="Tipo">
-  <a class="chip" href="/admin/atividade" <%- tipo === '' ? 'aria-current="true"' : '' %>>Tudo</a>
-  <a class="chip" href="/admin/atividade?tipo=alteracoes" <%- tipo === 'alteracoes' ? 'aria-current="true"' : '' %>>Alterações</a>
-  <a class="chip" href="/admin/atividade?tipo=acessos" <%- tipo === 'acessos' ? 'aria-current="true"' : '' %>>Entradas e tentativas</a>
+  <div class="segmento">
+    <a class="chip" href="/admin/atividade" <%- tipo === '' ? 'aria-current="true"' : '' %>>Tudo</a>
+    <a class="chip" href="/admin/atividade?tipo=alteracoes" <%- tipo === 'alteracoes' ? 'aria-current="true"' : '' %>>Alterações</a>
+    <a class="chip" href="/admin/atividade?tipo=acessos" <%- tipo === 'acessos' ? 'aria-current="true"' : '' %>>Entradas e tentativas</a>
+  </div>
 </div>
 <section class="card">
   <% if (!rows.length) { %>

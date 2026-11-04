@@ -127,11 +127,16 @@
   <dl class="ficha">
     <div><dt>Botão ou formulário</dt><dd><%= sourceLabel(lead.source) %> <small class="mono"><%= lead.source || '' %></small></dd></div>
     <% if (lead.message) { %><div><dt>Mensagem</dt><dd>“<%= lead.message %>”</dd></div><% } %>
-    <div><dt>CRM</dt><dd><% if (!st) { %>-<% } else { %><span class="selo <%= st.indexOf('ok') === 0 ? 'ok' : (st === 'sem-webhook' ? '' : 'alerta') %>"><%= st.indexOf('ok') === 0 ? 'Enviado' : (st === 'sem-webhook' ? 'Sem webhook' : 'Falhou') %></span> <small class="mono"><%= st %></small><% } %></dd></div>
+    <div><dt>CRM</dt><dd><% if (!st) { %>Não enviado<% } else { %><span class="selo <%= st.indexOf('ok') === 0 ? 'ok' : (st === 'sem-webhook' ? '' : 'erro') %>"><%= st.indexOf('ok') === 0 ? 'Enviado' : (st === 'sem-webhook' ? 'Sem webhook' : 'Falhou') %></span> <small class="mono"><%= st %></small><% } %></dd></div>
     <div><dt>Navegador</dt><dd><small class="mono"><%= lead.user_agent || '-' %></small></dd></div>
   </dl>
-  <form method="post" action="/admin/leads/<%= lead.id %>/delete" data-confirmar="Excluir o lead de <%= lead.name || 'sem nome' %>? Não dá para desfazer." style="margin-top:14px">
-    <button class="btn perigo peq">Excluir lead</button>
-  </form>
+  <div class="acoes" style="margin-top:16px">
+    <% if (podeReenviar) { %>
+      <form method="post" action="/admin/leads/<%= lead.id %>/reenviar"><button class="btn sec peq"><%- icon('reenviar') %>Reenviar ao CRM</button></form>
+    <% } %>
+    <form method="post" action="/admin/leads/<%= lead.id %>/delete" data-confirmar="Excluir o lead de <%= lead.name || 'sem nome' %>? Não dá para desfazer.">
+      <button class="btn perigo peq">Excluir lead</button>
+    </form>
+  </div>
 </section>
 <%- include('partials/bottom') %>

@@ -7,7 +7,7 @@ import { pathForFile, normalizePath, pathOfUrl, kindForPath } from '../lib/pages
 import { hashPassword, verifyPassword, isPasswordHash, passwordProblem, tempPassword, safeNext, normEmail } from '../lib/auth.js';
 import { parsePeriod, dayIndex, dayStart } from '../lib/stats.js';
 import { utmValue, utmUrl } from '../lib/admin.js';
-import { delta, dur, pct } from '../lib/format.js';
+import { delta, dur, pct, curto } from '../lib/format.js';
 
 const q = (s) => new URLSearchParams(s);
 const pick = (r) => [r.source, r.medium];
@@ -225,4 +225,12 @@ test('fila por e-mail: muitos IPs não passam de uma tentativa por vez; aparelho
   const dono = loginAttempt('100.99.0.1', email, true);
   assert.equal(dono.ok, true);
   assert.equal(dono.delayMs, 0);
+});
+
+test('endereço curto do webhook: sem a query (token) e cortado', () => {
+  assert.equal(curto('https://crm.exemplo.com/api/hook?token=segredo'), 'crm.exemplo.com/api/hook');
+  assert.equal(curto('https://crm.exemplo.com/'), 'crm.exemplo.com');
+  assert.equal(curto('https://crm.exemplo.com/' + 'a'.repeat(80)).length, 44);
+  assert.ok(curto('https://crm.exemplo.com/' + 'a'.repeat(80)).endsWith('…'));
+  assert.equal(curto('não é endereço'), '');
 });

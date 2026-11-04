@@ -1,55 +1,137 @@
 <%- include('partials/top') %>
 <%- include('partials/page-head') %>
-<section class="card">
-  <div class="card__topo"><h2>Página</h2></div>
-  <form class="campos" method="post" action="/admin/paginas/<%= page.id %>/config">
-    <div class="campos linha">
-      <label>Nome no painel <input type="text" name="name" value="<%= page.name %>" maxlength="80" required></label>
-      <label>Tipo
-        <select name="kind">
-          <% Object.keys(KINDS).forEach(function (k) { %><option value="<%= k %>" <%= page.kind === k ? 'selected' : '' %>><%= KINDS[k] %></option><% }) %>
-        </select>
-        <span class="ajuda">Só as páginas de captação aparecem no menu e na visão geral.</span>
-      </label>
-    </div>
-    <% if (user.role === 'super') { %>
-      <label>Webhook dos leads desta página
-        <input type="url" name="webhook_url" value="<%= draft ? draft.webhook_url : (page.webhook_url || '') %>" placeholder="<%= lp.webhook_url ? 'Vazio: usa o webhook do site' : 'https://seu-crm.com/webhook' %>">
-        <span class="ajuda">Para mandar os leads desta página para outro funil do CRM. Vazio, vale o webhook do site. "Testar" envia um lead de teste para o endereço digitado, sem salvar.</span>
-      </label>
+<%
+  const souSuper = user.role === 'super';
+  const d = draft || {};
+  const destino = d.destino || (page.webhook_url ? 'proprio' : 'site');
+  const urlPropria = d.webhook_url != null ? d.webhook_url : (page.webhook_url || '');
+  const temDestino = !!(page.webhook_url || lp.webhook_url);
+  const visivel = page.kind === 'landing';
+  const e = envio;
+  // o que a resposta do CRM quer dizer, em português
+  const motivo = function (st) {
+    if (!st) return '';
+    if (/^http \d+/.test(st)) return 'o CRM respondeu com erro (' + st + ')';
+    if (/tempo esgotado/.test(st)) return 'o CRM não respondeu a tempo';
+    if (/rede interna/.test(st)) return 'endereço de rede interna não é aceito';
+    return 'não foi possível conectar ao CRM';
+  };
+  const exemplo = {
+    event: 'lead.created', page: page.path, page_name: page.name, name: 'Maria',
+    phone: '5561999990000', phone_e164: '+5561999990000', phone_local: '61999990000',
+    source: 'botão ou formulário usado', created_at: '2026-11-04T13:00:00.000Z',
+    utm_source: 'google', utm_medium: 'cpc', utm_campaign: 'hipro_bsb', utm_term: 'flacidez rosto', utm_content: 'rsa',
+    channel: 'Google Ads', gclid: '...', click_id: '...', landing_page: page.path, referrer: '', device: 'celular',
+    first_touch: { source: 'instagram', medium: 'social', campaign: 'perfil', date: '...' },
+  };
+  const campos = [
+    ['name', 'Nome'],
+    ['phone · phone_e164 · phone_local', 'Telefone em três formatos: 5561999990000, +5561999990000 e 61999990000'],
+    ['page_name · page', 'Nome e endereço desta página (' + page.name + ', ' + page.path + ')'],
+    ['source', 'Botão ou formulário usado'],
+    ['utm_source · utm_medium · utm_campaign', 'Origem, mídia e campanha'],
+    ['utm_term · utm_content', 'Palavra-chave e anúncio'],
+    ['channel', 'Canal: Google Ads, Instagram, busca, direto...'],
+    ['gclid · click_id', 'Identificador do clique no anúncio'],
+    ['landing_page · referrer · device', 'Por onde entrou, site de onde veio e aparelho'],
+    ['first_touch', 'Primeiro contato: origem, mídia, campanha e data'],
+    ['created_at', 'Data e hora do contato'],
+  ];
+%>
+
+<form class="card ajuste" method="post" action="/admin/paginas/<%= page.id %>/nome">
+  <div class="ajuste__corpo">
+    <div class="card__topo"><h2>Nome da página</h2><p>Aparece no menu, nos relatórios e nos leads enviados ao CRM.</p></div>
+    <input class="campo-curto" type="text" name="name" value="<%= page.name %>" maxlength="80" required aria-label="Nome da página">
+  </div>
+  <div class="ajuste__rodape">
+    <span class="pequeno">Até 80 caracteres.</span>
+    <div class="acoes"><button class="btn">Salvar nome</button></div>
+  </div>
+</form>
+
+<section class="card ajuste" id="envio" aria-labelledby="envio-titulo">
+  <div class="ajuste__corpo">
+    <div class="card__topo"><h2 id="envio-titulo">Envio dos leads ao CRM</h2><p>Cada contato deixado nesta página vai na hora para o CRM.</p></div>
+
+    <% if (!temDestino) { %>
+      <div class="saude alerta"><%- icon('alerta') %><b>Nenhum CRM ligado</b><p>Os leads desta página ficam guardados só no painel.<%= souSuper ? ' Escolha um destino abaixo.' : ' Fale com o super admin.' %></p></div>
+    <% } else if (e.falharam) { %>
+      <div class="saude erro"><%- icon('erro') %>
+        <b><%= e.falharam === 1 ? '1 lead não chegou' : fmt.int(e.falharam) + ' leads não chegaram' %> ao CRM</b>
+        <p>Nos últimos 30 dias. Último erro: <%= motivo(e.ultimoErro) %>.</p>
+        <% if (souSuper) { %><button class="btn sec peq" form="form-reenviar"><%- icon('reenviar') %>Reenviar <%= e.falharam > 25 ? 'os 25 mais recentes' : (e.falharam === 1 ? 'o lead' : 'os ' + e.falharam) %></button><% } %>
+      </div>
+    <% } else if (e.entregues) { %>
+      <div class="saude ok"><%- icon('ok') %><b>Funcionando</b><p><%= fmt.int(e.entregues) %> <%= e.entregues === 1 ? 'lead entregue' : 'leads entregues' %> nos últimos 30 dias · último envio <%= fmt.rel(e.ultimo) %></p></div>
     <% } else { %>
-      <p class="pequeno">Para onde vão os leads (webhook do CRM) é configurado pelo super admin.</p>
+      <div class="saude"><%- icon('info') %><b>Nenhum envio nos últimos 30 dias</b><p><%= souSuper ? 'Use "Enviar teste" para conferir se o CRM recebe.' : 'Quando chegar um lead, o envio aparece aqui.' %></p></div>
     <% } %>
-    <div class="acoes">
-      <button class="btn">Salvar</button>
-      <% if (user.role === 'super') { %><button class="btn sec" formaction="/admin/paginas/<%= page.id %>/webhook/test">Testar webhook</button><% } %>
+
+    <% if (souSuper) { %>
+      <form id="form-destino" method="post" action="/admin/paginas/<%= page.id %>/destino" novalidate>
+        <fieldset class="opcoes">
+          <legend>Para onde vão os leads</legend>
+          <label class="opcao"><input type="radio" name="destino" value="site" <%= destino === 'site' ? 'checked' : '' %>><span><b>O mesmo destino do site</b><small><%= lp.webhook_url ? fmt.curto(lp.webhook_url) : 'Nenhum configurado ainda (em Site e arquivos)' %></small></span></label>
+          <label class="opcao"><input type="radio" name="destino" value="proprio" <%= destino === 'proprio' ? 'checked' : '' %>><span><b>Um endereço só desta página</b><small>Para mandar estes leads para outro funil do CRM.</small></span></label>
+          <label class="url-propria">Endereço do webhook
+            <input type="url" name="webhook_url" value="<%= urlPropria %>" placeholder="https://seu-crm.com/webhook" autocomplete="off" spellcheck="false">
+          </label>
+        </fieldset>
+      </form>
+    <% } else { %>
+      <p class="mudo">Destino: <%= page.webhook_url ? 'um endereço só desta página' : 'o mesmo do site' %>. Só o super admin muda o destino.</p>
+    <% } %>
+
+    <details class="mais">
+      <summary>O que o CRM recebe</summary>
+      <div class="rolagem">
+        <table class="campos-crm">
+          <thead><tr><th>Campo</th><th>O que é</th></tr></thead>
+          <tbody><% campos.forEach(function (c) { %><tr><td><%= c[0] %></td><td><%= c[1] %></td></tr><% }) %></tbody>
+        </table>
+      </div>
+      <div class="acoes" style="margin-top:12px">
+        <button type="button" class="btn sec peq" data-copiar="exemplo-json">Copiar exemplo em JSON</button>
+      </div>
+      <pre id="exemplo-json" hidden><%= JSON.stringify(exemplo, null, 2) %></pre>
+    </details>
+  </div>
+  <% if (souSuper) { %>
+    <div class="ajuste__rodape">
+      <% if (teste) { %>
+        <span class="resultado <%= teste.ok ? 'ok' : 'erro' %>" role="status"><%- icon(teste.ok ? 'ok' : 'erro') %><%= teste.ok ? 'Teste recebido pelo CRM (' + teste.status + ')' : 'O teste falhou: ' + motivo(teste.status) %></span>
+      <% } else { %>
+        <span class="pequeno">O teste manda um lead de exemplo para o destino marcado, sem salvar.</span>
+      <% } %>
+      <div class="acoes">
+        <button class="btn sec" form="form-destino" formaction="/admin/paginas/<%= page.id %>/webhook/test"><%- icon('enviar') %>Enviar teste</button>
+        <button class="btn" form="form-destino">Salvar destino</button>
+      </div>
     </div>
-  </form>
+  <% } %>
 </section>
+<% if (souSuper && e.falharam) { %>
+  <form id="form-reenviar" method="post" action="/admin/paginas/<%= page.id %>/reenviar" data-confirmar="Reenviar ao CRM os leads que falharam? Se algum chegou sem o painel saber, ele pode aparecer duplicado." hidden></form>
+<% } %>
 
-<section class="card">
-  <div class="card__topo"><h2>O que o webhook recebe</h2></div>
-  <details class="mais">
-    <summary>Ver os campos enviados ao CRM</summary>
-    <pre class="mono rolagem" style="margin:0;font-size:12.5px;line-height:1.5">{
-  "event": "lead.created",
-  "page": "<%= page.path %>",
-  "page_name": "<%= page.name %>",
-  "name": "Maria", "phone": "5561999990000", "phone_e164": "+5561999990000",
-  "source": "botão ou formulário usado",
-  "utm_source": "google", "utm_medium": "cpc", "utm_campaign": "hipro_bsb",
-  "utm_term": "flacidez rosto", "utm_content": "rsa",
-  "utm": { "source": "...", "medium": "...", "campaign": "...", "term": "...", "content": "..." },
-  "channel": "Google Ads", "gclid": "...", "landing_page": "/", "referrer": "", "device": "celular",
-  "first_touch": { "source": "instagram", "medium": "social", "campaign": "perfil", "date": "..." },
-  "contact": { "name": "Maria", "phone": "5561999990000" }
-}</pre>
-  </details>
-</section>
-
-<section class="card">
-  <div class="card__topo"><h2>Não contar os seus acessos</h2></div>
-  <p class="mudo">Abra o endereço abaixo uma vez em cada celular ou computador da equipe. Daquele aparelho em diante, as visitas não entram nos números. Para voltar a contar, troque <code>off</code> por <code>on</code>.</p>
-  <span class="copiar" style="margin-top:12px"><input type="text" id="lpm-off" readonly value="<%= pageUrl %>?lpm=off"><button type="button" class="btn sec" data-copiar="lpm-off">Copiar</button></span>
-</section>
+<% if (souSuper && (!page.domain || !page.present)) { %>
+  <section class="card">
+    <h2>Exibição no painel</h2>
+    <p class="mudo" style="margin-top:4px"><%= !page.domain ? 'O site desta página está sem domínio, então ela não aparece no menu. O domínio fica em Site e arquivos.' : 'Esta página saiu do site no último envio de arquivos, então não aparece no menu. Os números e os leads dela continuam guardados.' %></p>
+  </section>
+<% } else if (souSuper) { %>
+  <section class="card">
+    <div class="linha-acao">
+      <div>
+        <h2><%= visivel ? 'Exibição no painel' : 'Página oculta do painel' %></h2>
+        <p><%= visivel ? 'Esta página aparece no menu, na visão geral e nos filtros. Oculte páginas que não captam contatos, como a de obrigado: ela continua no ar e medindo.' : 'A página continua no ar e medindo, mas não aparece no menu, na visão geral nem nos filtros.' %></p>
+      </div>
+      <form method="post" action="/admin/paginas/<%= page.id %>/visibilidade"<% if (visivel) { %> data-confirmar="Ocultar <%= page.name %> do painel? A página continua no ar. Para mostrar de novo, abra a página em Site e arquivos."<% } %>>
+        <input type="hidden" name="mostrar" value="<%= visivel ? '0' : '1' %>">
+        <button class="btn <%= visivel ? 'sec' : '' %>"><%- icon(visivel ? 'oculto' : 'painel') %><%= visivel ? 'Ocultar do painel' : 'Mostrar no painel' %></button>
+      </form>
+    </div>
+  </section>
+<% } %>
 <%- include('partials/bottom') %>

@@ -31,8 +31,10 @@ node scripts/hash-password.js        # digite a senha e aperte Ctrl+D
 
 ## Usuários e papéis
 
-- **Super admin**: tudo, inclusive usuários, arquivos do site, domínio e o registro de atividade.
-- **Admin**: visão geral, resultados das páginas, leads, links com UTM e configurações das páginas.
+- **Super admin**: tudo, inclusive usuários, arquivos do site, domínio, destino dos leads (webhook), reenvio
+  ao CRM, mostrar ou ocultar páginas e o registro de atividade.
+- **Admin**: visão geral, resultados das páginas, leads, links com UTM e o nome das páginas; vê se o envio ao
+  CRM está funcionando, sem ver nem mudar o endereço.
 
 Usuário novo recebe uma senha provisória (mostrada uma vez) e troca no primeiro acesso.
 Desativar, excluir ou trocar a senha encerra as sessões da pessoa na hora. O painel não deixa
@@ -46,9 +48,13 @@ sem seguir redirecionamento; quem muda ou testa webhook é o super admin.
 ## Páginas
 
 Cada HTML do site vira uma página com endereço próprio: o arquivo index é `/`, `fullface.html` é
-`/fullface`, `pasta/index.html` é `/pasta`. Nome (tirado do `<title>`) e tipo (captação, obrigado,
-outra) mudam em Configurações. Só páginas de captação de sites com domínio aparecem no menu.
-Cada página pode ter um webhook próprio; sem ele, vale o webhook do site.
+`/fullface`, `pasta/index.html` é `/pasta`. O nome sai do `<title>` e muda em Configurações. Só páginas
+de captação de sites com domínio aparecem no menu; a de obrigado já nasce fora, e o super admin oculta ou
+mostra qualquer página em Configurações (ela continua no ar e medindo).
+
+Cada página pode ter um webhook próprio; sem ele, vale o webhook do site. Configurações mostra se o envio
+ao CRM está funcionando (entregues e falhas dos últimos 30 dias, com o motivo), testa o destino marcado
+sem salvar e reenvia os leads que falharam (até 25 por vez). A ficha do lead também reenvia.
 
 ## Medição
 
@@ -68,8 +74,16 @@ mesmo visitante nos 90 dias anteriores. O lead leva a origem da visita em que co
 contato do visitante; sem visita (script bloqueado), a origem vem da UTM do endereço da página.
 
 Fora dos números: robôs (user-agent), navegadores automatizados (`navigator.webdriver`), aparelhos
-que abriram a página com `?lpm=off` (volta com `?lpm=on`) e visitas abertas com `?lpm=test` (ficam
+que abriram a página com `?lpm=off` (volta com `?lpm=on`; o link pronto fica em Minha conta) e visitas abertas com `?lpm=test` (ficam
 marcadas como teste, visíveis só no status de Site e arquivos). A medição fica 25 meses; leads ficam.
+
+## Visual
+
+Menu lateral no computador e gaveta no celular (atributo `popover`, com reserva em `admin.js` para
+navegador antigo), modo claro e escuro pelo sistema. Interface neutra; cor só onde é dado: cada página tem a
+sua (bolinha no menu, linhas e barras dos gráficos), conferida com validador de paleta para daltonismo.
+Fonte Figtree (`public/fonts`, licença SIL OFL) e ícones Lucide (licença ISC) desenhados inline em
+`lib/icons.js`.
 
 ## Publicar um site por linha de comando
 

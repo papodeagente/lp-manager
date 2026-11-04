@@ -1,17 +1,32 @@
 <%- include('partials/top') %>
 <div class="cabeca"><div><h1>Minha conta</h1><p><%= user.email %> · <%= user.role === 'super' ? 'Super admin' : 'Admin' %></p></div></div>
-<div class="grade-2">
+
+<form class="card ajuste" method="post" action="/admin/conta">
+  <div class="ajuste__corpo">
+    <div class="card__topo"><h2>Seu nome</h2><p>Como você aparece no painel.</p></div>
+    <input class="campo-curto" type="text" name="name" value="<%= user.name %>" maxlength="80" required aria-label="Seu nome">
+  </div>
+  <div class="ajuste__rodape">
+    <span class="pequeno">Você entra com <%= user.email %>.</span>
+    <div class="acoes"><button class="btn">Salvar nome</button></div>
+  </div>
+</form>
+
+<section class="card">
+  <div class="linha-acao">
+    <div><h2>Senha</h2><p>Trocar a senha encerra as outras sessões abertas com a sua conta.</p></div>
+    <a class="btn sec" href="/admin/conta/senha"><%- icon('senha') %>Trocar senha</a>
+  </div>
+</section>
+
+<% if (dominios.length) { %>
   <section class="card">
-    <div class="card__topo"><h2>Nome</h2></div>
-    <form class="campos" method="post" action="/admin/conta">
-      <label>Como aparece no painel <input type="text" name="name" value="<%= user.name %>" maxlength="80" required></label>
-      <div class="acoes"><button class="btn">Salvar</button></div>
-    </form>
+    <div class="card__topo"><h2>Não contar os seus acessos</h2><p>Abra o link uma vez em cada celular e computador seu e da equipe. Daquele aparelho em diante, as visitas ficam fora dos números. Para voltar a contar, troque off por on no fim do link.</p></div>
+    <div class="campos">
+      <% dominios.forEach(function (dm, i) { %>
+        <span class="copiar"><input type="text" id="lpm-off-<%= i %>" readonly value="https://<%= dm %>/?lpm=off" aria-label="Link para não contar os acessos em <%= dm %>"><button type="button" class="btn sec" data-copiar="lpm-off-<%= i %>">Copiar</button></span>
+      <% }) %>
+    </div>
   </section>
-  <section class="card">
-    <div class="card__topo"><h2>Senha</h2></div>
-    <p class="mudo">Trocar a senha encerra as outras sessões abertas com a sua conta.</p>
-    <div class="acoes" style="margin-top:14px"><a class="btn sec" href="/admin/conta/senha">Trocar senha</a></div>
-  </section>
-</div>
+<% } %>
 <%- include('partials/bottom') %>

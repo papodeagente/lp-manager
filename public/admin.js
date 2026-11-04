@@ -87,8 +87,10 @@
       rotulosX(n, pw, function (i) {
         el('text', { x: X(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === n - 1 && n > 1 ? 'end' : 'middle', 'class': 'eixo' }, svg).textContent = labels[i];
       });
+      // com uma série só, a cor é a da página aberta (--cor); com várias, cada página tem a sua
+      var serie = function (k) { return series.length > 1 && k < 3 ? 's' + (k + 1) : ''; };
       series.forEach(function (s, k) {
-        var cls = 's' + (k + 1), pts = s.values.map(function (v, i) { return X(i).toFixed(1) + ',' + Y(v).toFixed(1); });
+        var cls = serie(k), pts = s.values.map(function (v, i) { return X(i).toFixed(1) + ',' + Y(v).toFixed(1); });
         if (series.length === 1 && n > 1) el('path', { d: 'M' + X(0) + ',' + Y(0) + ' L' + pts.join(' L') + ' L' + X(n - 1) + ',' + Y(0) + ' Z', 'class': 'area' }, svg);
         if (n > 1) el('polyline', { points: pts.join(' '), 'class': 'linha ' + cls }, svg);
         var last = s.values[n - 1];
@@ -96,7 +98,7 @@
         if (series.length === 1) el('text', { x: X(n - 1) + 9, y: Y(last) + 4, 'class': 'rotulo' }, svg).textContent = compacto(last);
       });
       var mira = el('line', { y1: topo, y2: topo + ph, 'class': 'mira', visibility: 'hidden' }, svg);
-      var pontos = series.map(function (s, k) { return el('circle', { r: 4, 'class': 'ponto-fim s' + (k + 1), visibility: 'hidden' }, svg); });
+      var pontos = series.map(function (s, k) { return el('circle', { r: 4, 'class': 'ponto-fim ' + serie(k), visibility: 'hidden' }, svg); });
       function mostra(i) {
         idx = i;
         var x = X(i);
@@ -104,7 +106,7 @@
         pontos.forEach(function (p, k) { p.setAttribute('cx', x); p.setAttribute('cy', Y(series[k].values[i])); p.setAttribute('visibility', 'visible'); });
         var y = Math.min.apply(null, series.map(function (s) { return Y(s.values[i]); }));
         tip.mostra(labels[i], series.map(function (s, k) {
-          return { cls: 's' + (k + 1), valor: nf.format(s.values[i]), nome: series.length > 1 ? s.name : (cfg.unidade || '') };
+          return { cls: serie(k), valor: nf.format(s.values[i]), nome: series.length > 1 ? s.name : (cfg.unidade || '') };
         }), x, y);
       }
       function some() {
@@ -259,6 +261,10 @@
     else if (alvo && alvo.select) { alvo.select(); try { d.execCommand('copy'); feito(); } catch (err) {} }
   });
 
+  function botoes(f) {
+    return Array.prototype.filter.call(f.elements, function (el) { return el.tagName === 'BUTTON'; });
+  }
+
   // confirmar antes de ações sem volta e travar o botão para não enviar duas vezes
   d.addEventListener('submit', function (e) {
     var f = e.target, msg = f.getAttribute('data-confirmar');
@@ -266,14 +272,23 @@
     if (f.method.toLowerCase() !== 'post') return;
     if (f.dataset.enviando) { e.preventDefault(); return; }
     f.dataset.enviando = '1';
-    setTimeout(function () { f.querySelectorAll('button').forEach(function (b) { b.disabled = true; }); }, 0);
+    // f.elements inclui os botões de fora do formulário ligados a ele pelo atributo form
+    setTimeout(function () { botoes(f).forEach(function (b) { b.disabled = true; }); }, 0);
   });
   // ao voltar pelo histórico, a página volta com os botões soltos
   window.addEventListener('pageshow', function () {
     d.querySelectorAll('form[data-enviando]').forEach(function (f) {
       delete f.dataset.enviando;
-      f.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+      botoes(f).forEach(function (b) { b.disabled = false; });
     });
+  });
+
+  // aba ativa sempre visível quando as abas rolam de lado (celular)
+  d.querySelectorAll('.abas [aria-current="page"]').forEach(function (a) {
+    var abas = a.parentNode;
+    if (abas.scrollWidth <= abas.clientWidth) return;
+    var ra = a.getBoundingClientRect(), rb = abas.getBoundingClientRect();
+    abas.scrollLeft += (ra.left - rb.left) - (abas.clientWidth - ra.width) / 2;
   });
 
   // filtros que se aplicam sozinhos ao mudar
@@ -305,6 +320,17 @@
       input.type = 'text';
     });
   });
+
+  // menu do celular: em navegador sem popover, o botão abre e fecha a gaveta por classe
+  if (!Object.prototype.hasOwnProperty.call(HTMLElement.prototype, 'popover')) {
+    d.querySelectorAll('[popovertarget]').forEach(function (b) {
+      var alvo = d.getElementById(b.getAttribute('popovertarget'));
+      if (!alvo) return;
+      b.addEventListener('click', function () {
+        alvo.classList.toggle('aberta', b.getAttribute('popovertargetaction') === 'hide' ? false : !alvo.classList.contains('aberta'));
+      });
+    });
+  }
 
   // montador de link com UTM: mesma limpeza que o servidor faz ao salvar
   var form = d.getElementById('utm-form');

@@ -1,8 +1,9 @@
 <%- include('partials/head') %>
 <main class="entrar">
   <div class="entrar__caixa">
-    <div class="entrar__marca"><b><%= panelTitle %></b><span>painel das páginas</span></div>
+    <div class="entrar__marca"><span class="marca__logo" aria-hidden="true"><%= panelTitle.trim().charAt(0).toUpperCase() %></span><div><b><%= panelTitle %></b><span>Painel das páginas</span></div></div>
     <form class="card campos" method="post" action="/admin/login" autocomplete="on">
+      <h1>Entrar</h1>
       <% if (error) { %><div class="aviso alerta" role="alert"><%= error %></div><% } %>
       <% if (noUsers) { %><div class="aviso alerta" role="alert">Nenhum usuário cadastrado ainda. Configure SUPERADMIN_EMAIL e SUPERADMIN_PASSWORD_HASH no servidor.</div><% } %>
       <input type="hidden" name="next" value="<%= next %>">

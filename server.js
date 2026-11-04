@@ -22,6 +22,7 @@ import {
 import { makeStats } from './lib/stats.js';
 import * as fmt from './lib/format.js';
 import { registerAdmin } from './lib/admin.js';
+import { icon } from './lib/icons.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -71,7 +72,7 @@ const leadStmts = {
       @page_id, @page_path, @visit_id, @visitor_id, @utm_source, @utm_medium, @utm_campaign, @utm_term, @utm_content, @click_type, @click_id,
       @channel, @referrer, @landing_page, @device, @first_source, @first_medium, @first_campaign, @first_seen, @test)`),
   countBySlug: db.prepare('SELECT COUNT(*) AS n FROM leads WHERE slug = ?'),
-  setStatus: db.prepare('UPDATE leads SET webhook_status = ? WHERE id = ?'),
+  setStatus: db.prepare('UPDATE leads SET webhook_status = ?, webhook_at = ? WHERE id = ?'),
 };
 const setWebhookUrl = db.prepare('UPDATE lps SET webhook_url = ? WHERE slug = ?');
 
@@ -280,7 +281,7 @@ const ASSET_V = (() => {
 function render(req, res, view, data = {}) {
   res.set('Cache-Control', 'no-store');
   res.render(view, {
-    title: '', flash: null, flashWarn: null, panelTitle: PANEL_TITLE, assetV: ASSET_V, fmt,
+    title: '', flash: null, flashWarn: null, panelTitle: PANEL_TITLE, assetV: ASSET_V, fmt, icon,
     navPages: req.user ? pages.live() : [], path: req.path, user: req.user || null, ...data,
   });
 }
@@ -767,7 +768,7 @@ app.post('/api/lead', ah(async (req, res) => {
     const page = lead.page_id ? pages.get(lead.page_id) : null;
     if (webhookFor(lp, page)) {
       fireWebhook(lp, lead, page).then((status) => {
-        try { leadStmts.setStatus.run(status, info.lastInsertRowid); } catch (_) {}
+        try { leadStmts.setStatus.run(status, Date.now(), info.lastInsertRowid); } catch (_) {}
       });
     }
   } catch (e) {

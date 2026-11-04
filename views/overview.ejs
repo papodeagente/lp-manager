@@ -51,7 +51,7 @@
     <section class="card">
       <div class="card__topo"><h2>Acessos por <%= period.hourly ? 'hora' : 'dia' %></h2><p>Toque, passe o mouse ou use as setas para ver cada <%= period.hourly ? 'hora' : 'dia' %>.</p></div>
       <% if (c.series.length > 1) { %>
-        <div class="legenda"><% c.series.forEach(function (s, i) { %><span><i class="<%= i ? 's' + (i + 1) : '' %>"></i><%= s.name %></span><% }) %></div>
+        <div class="legenda"><% c.series.forEach(function (s, i) { %><span><i class="<%= i < 3 ? 's' + (i + 1) : '' %>"></i><%= s.name %></span><% }) %></div>
       <% } %>
       <script type="application/json" id="dados-visao"><%- chartJson %></script>
       <div class="grafico" data-grafico="linhas" data-dados="dados-visao" data-unidade="acessos" aria-label="Acessos por <%= period.hourly ? 'hora' : 'dia' %> de cada página"></div>

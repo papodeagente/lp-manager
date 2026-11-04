@@ -1,8 +1,21 @@
+<%
+  const iPag = navPages.findIndex(function (p) { return p.id === page.id; });
+  const endereco = page.domain ? page.domain + (page.path === '/' ? '/' : page.path) : null;
+  const situacao = !page.domain ? 'Site sem domínio' : (!page.present ? 'Fora do site' : (page.kind !== 'landing' ? 'Oculta do painel' : null));
+%>
 <div class="cabeca">
   <div>
-    <h1><%= page.name %></h1>
-    <p><a href="<%= 'https://' + page.domain + (page.path === '/' ? '/' : page.path) %>" target="_blank" rel="noopener"><%= page.domain %><%= page.path === '/' ? '/' : page.path %></a></p>
+    <h1><i class="ponto <%= iPag >= 0 && iPag < 3 ? 's' + (iPag + 1) : (iPag < 0 ? 'neutro' : '') %>" aria-hidden="true"></i><%= page.name %><% if (situacao) { %> <span class="selo"><%= situacao %></span><% } %></h1>
+    <p class="cabeca__meta">
+      <% if (endereco) { %><a href="https://<%= endereco %>" target="_blank" rel="noopener"><%= endereco %></a><% } else { %><span class="mono"><%= page.path %></span><% } %>
+      <span><%= page.last_access ? 'Último acesso ' + fmt.rel(page.last_access) : 'Nenhum acesso medido ainda' %></span>
+    </p>
   </div>
+  <% if (endereco) { %>
+    <div class="cabeca__acoes">
+      <a class="btn sec" href="https://<%= endereco %>" target="_blank" rel="noopener"><%- icon('abrir') %>Abrir página</a>
+    </div>
+  <% } %>
 </div>
 <nav class="abas" aria-label="Seções da página">
   <a href="/admin/paginas/<%= page.id %>" <%- tab === 'resultados' ? 'aria-current="page"' : '' %>>Resultados</a>

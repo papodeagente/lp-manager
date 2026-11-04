@@ -16,12 +16,12 @@
 
 <section class="card">
   <div class="card__topo"><h2>Criar link</h2><p>Para usar fora do site: bio, stories, WhatsApp, e-mail, impresso.</p></div>
-  <div class="acoes" style="margin-bottom:14px" aria-label="Modelos">
+  <div class="modelos" role="group" aria-label="Modelos prontos">
     <% modelos.forEach(function (m) { %><button type="button" class="chip" data-modelo="<%= JSON.stringify(m[1]) %>"><%= m[0] %></button><% }) %>
   </div>
   <form id="utm-form" class="campos" method="post" action="/admin/paginas/<%= page.id %>/links" data-base="<%= baseUrl %>">
     <div class="campos linha">
-      <label>Nome do link <input type="text" name="name" value="<%= d.name || '' %>" required maxlength="80" placeholder="Ex.: Bio do Instagram"></label>
+      <label>Nome do link <span class="ajuda">como aparece na lista abaixo</span><input type="text" name="name" value="<%= d.name || '' %>" required maxlength="80" placeholder="Ex.: Bio do Instagram"></label>
       <label>Origem <span class="ajuda">utm_source: de onde vem</span><input type="text" name="source" value="<%= d.source || '' %>" required list="lista-origens" placeholder="instagram"></label>
       <label>Mídia <span class="ajuda">utm_medium: tipo de tráfego</span><input type="text" name="medium" value="<%= d.medium || '' %>" required list="lista-midias" placeholder="social"></label>
       <label>Campanha <span class="ajuda">utm_campaign: o que divulga</span><input type="text" name="campaign" value="<%= d.campaign || '' %>" required placeholder="ultrassom-novembro"></label>
@@ -46,12 +46,13 @@
       <% links.forEach(function (l) { %>
         <li>
           <b><%= l.name %></b>
-          <span class="nums"><span><b class="num"><%= fmt.int(l.visits) %></b><%= l.visits === 1 ? 'acesso' : 'acessos' %></span><span><b class="num"><%= fmt.int(l.leads) %></b><%= l.leads === 1 ? 'lead' : 'leads' %></span></span>
+          <div class="nums"><span><b class="num"><%= fmt.int(l.visits) %></b><%= l.visits === 1 ? 'acesso' : 'acessos' %></span><span><b class="num"><%= fmt.int(l.leads) %></b><%= l.leads === 1 ? 'lead' : 'leads' %></span>
+            <form method="post" action="/admin/paginas/<%= page.id %>/links/<%= l.id %>/delete" data-confirmar="Excluir o link &quot;<%= l.name %>&quot;? Quem já tem o endereço continua chegando normalmente.">
+              <button class="btn so-icone" aria-label="Excluir o link <%= l.name %>" title="Excluir link"><%- icon('lixeira') %></button>
+            </form>
+          </div>
           <span class="utm mono"><%= l.source %> / <%= l.medium %> / <%= l.campaign %><%= l.content ? ' / ' + l.content : '' %><%= l.term ? ' / ' + l.term : '' %></span>
           <span class="copiar"><input type="text" id="link-<%= l.id %>" readonly value="<%= l.url %>" aria-label="Endereço do link <%= l.name %>"><button type="button" class="btn sec peq" data-copiar="link-<%= l.id %>">Copiar</button></span>
-          <form method="post" action="/admin/paginas/<%= page.id %>/links/<%= l.id %>/delete" data-confirmar="Excluir o link &quot;<%= l.name %>&quot;? Quem já tem o endereço continua chegando normalmente.">
-            <button class="btn perigo peq">Excluir</button>
-          </form>
         </li>
       <% }) %>
     </ul>
