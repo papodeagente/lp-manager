@@ -1,0 +1,23 @@
+<%- include('period', { base: base, period: f.period, comTudo: true, extra: extra, hidden: { pagina: page ? '' : (f.pagina || ''), canal: f.canal, q: f.busca } }) %>
+<form class="card campos linha" method="get" action="<%= base %>">
+  <input type="hidden" name="p" value="<%= f.period.key %>">
+  <% if (f.period.key === 'custom') { %><input type="hidden" name="de" value="<%= f.period.de %>"><input type="hidden" name="ate" value="<%= f.period.ate %>"><% } %>
+  <% if (!page) { %>
+    <label>Página
+      <select name="pagina" data-auto>
+        <option value="">Todas</option>
+        <% allPages.forEach(function (p) { %><option value="<%= p.id %>" <%= f.pagina === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
+      </select>
+    </label>
+  <% } %>
+  <label>Origem
+    <select name="canal" data-auto>
+      <option value="">Todas</option>
+      <% Object.keys(CHANNELS).forEach(function (k) { %><option value="<%= k %>" <%= f.canal === k ? 'selected' : '' %>><%= CHANNELS[k] %></option><% }) %>
+    </select>
+  </label>
+  <label>Buscar nome ou telefone
+    <input type="search" name="q" value="<%= f.busca %>" placeholder="Ex.: Maria ou 98765">
+  </label>
+  <div class="acoes"><button class="btn sec">Filtrar</button><% if (f.canal || f.busca || (!page && f.pagina)) { %><a class="pequeno" href="<%= base %>?p=<%= f.period.key %>">Limpar</a><% } %></div>
+</form>

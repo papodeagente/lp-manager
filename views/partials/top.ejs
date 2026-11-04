@@ -1,0 +1,34 @@
+<%- include('head') %>
+<header class="topo">
+  <div class="topo__in">
+    <a class="marca" href="/admin"><b><%= panelTitle %></b><span>painel das páginas</span></a>
+    <div class="conta">
+      <details>
+        <summary aria-label="Menu da conta"><span class="avatar" aria-hidden="true"><%= (user.name || user.email).trim().charAt(0).toUpperCase() %></span><span class="nome"><%= user.name || user.email %></span></summary>
+        <div class="conta__menu">
+          <small><%= user.email %> · <%= user.role === 'super' ? 'Super admin' : 'Admin' %></small>
+          <a href="/admin/conta">Minha conta</a>
+          <form method="post" action="/admin/logout"><button>Sair</button></form>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+<nav class="menu" aria-label="Seções do painel">
+  <div class="menu__in">
+    <a href="/admin" <%- path === '/admin' ? 'aria-current="page"' : '' %>>Visão geral</a>
+    <% navPages.forEach(function (p, i) { const base = '/admin/paginas/' + p.id; const on = path === base || path.indexOf(base + '/') === 0; %>
+      <a href="/admin/paginas/<%= p.id %>" <%- on ? 'aria-current="page"' : '' %> title="<%= p.name %> (<%= p.domain %><%= p.path === '/' ? '' : p.path %>)"><i class="ponto <%= i < 3 ? 's' + (i + 1) : '' %>" aria-hidden="true"></i><span><%= p.name %></span></a>
+    <% }) %>
+    <i class="sep" aria-hidden="true"></i>
+    <a href="/admin/leads" <%- path === '/admin/leads' || path.indexOf('/admin/leads/') === 0 ? 'aria-current="page"' : '' %>>Leads</a>
+    <% if (user.role === 'super') { %>
+      <a href="/admin/usuarios" <%- path.indexOf('/admin/usuarios') === 0 ? 'aria-current="page"' : '' %>>Usuários</a>
+      <a href="/admin/site" <%- path.indexOf('/admin/site') === 0 ? 'aria-current="page"' : '' %>>Site e arquivos</a>
+      <a href="/admin/atividade" <%- path.indexOf('/admin/atividade') === 0 ? 'aria-current="page"' : '' %>>Atividade</a>
+    <% } %>
+  </div>
+</nav>
+<main class="conteudo" id="conteudo">
+<% if (flash) { %><div class="aviso ok" role="status"><%= flash %></div><% } %>
+<% if (flashWarn) { %><div class="aviso alerta" role="alert"><%= flashWarn %></div><% } %>

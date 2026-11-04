@@ -1,0 +1,18 @@
+<%# Filtro de período: uma linha acima de tudo o que ele muda. Recebe base (url) e extra (outros parâmetros). %>
+<% const extraQs = (typeof extra !== 'undefined' && extra) ? '&' + extra : ''; const presets = (typeof comTudo !== 'undefined' && comTudo) ? [['tudo', 'Tudo']].concat([['hoje', 'Hoje'], ['7d', '7 dias'], ['30d', '30 dias'], ['90d', '90 dias'], ['mes', 'Este mês']]) : [['hoje', 'Hoje'], ['7d', '7 dias'], ['30d', '30 dias'], ['90d', '90 dias'], ['mes', 'Este mês']]; %>
+<div class="filtros" role="group" aria-label="Período">
+  <% presets.forEach(function (p) { %>
+    <a class="chip" href="<%= base %>?p=<%= p[0] %><%= extraQs %>" <%- period.key === p[0] ? 'aria-current="true"' : '' %>><%= p[1] %></a>
+  <% }) %>
+  <details>
+    <summary class="chip" <%- period.key === 'custom' ? 'aria-current="true"' : '' %>><%= period.key === 'custom' ? period.label : 'Outro período' %></summary>
+    <form class="intervalo" method="get" action="<%= base %>">
+      <input type="hidden" name="p" value="custom">
+      <% if (typeof hidden !== 'undefined' && hidden) { Object.keys(hidden).forEach(function (k) { if (hidden[k]) { %><input type="hidden" name="<%= k %>" value="<%= hidden[k] %>"><% } }) } %>
+      <label>De <input type="date" name="de" value="<%= period.de %>" required></label>
+      <label>Até <input type="date" name="ate" value="<%= period.ate %>" required></label>
+      <button class="btn peq">Aplicar</button>
+    </form>
+  </details>
+  <% if (typeof resumo !== 'undefined' && resumo) { %><span class="resumo"><%= resumo %></span><% } %>
+</div>

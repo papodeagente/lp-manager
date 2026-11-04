@@ -1,0 +1,17 @@
+<%- include('partials/top') %>
+<div class="cabeca"><div><h1>Minha conta</h1><p><%= user.email %> · <%= user.role === 'super' ? 'Super admin' : 'Admin' %></p></div></div>
+<div class="grade-2">
+  <section class="card">
+    <div class="card__topo"><h2>Nome</h2></div>
+    <form class="campos" method="post" action="/admin/conta">
+      <label>Como aparece no painel <input type="text" name="name" value="<%= user.name %>" maxlength="80" required></label>
+      <div class="acoes"><button class="btn">Salvar</button></div>
+    </form>
+  </section>
+  <section class="card">
+    <div class="card__topo"><h2>Senha</h2></div>
+    <p class="mudo">Trocar a senha encerra as outras sessões abertas com a sua conta.</p>
+    <div class="acoes" style="margin-top:14px"><a class="btn sec" href="/admin/conta/senha">Trocar senha</a></div>
+  </section>
+</div>
+<%- include('partials/bottom') %>

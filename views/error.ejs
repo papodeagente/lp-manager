@@ -1,0 +1,7 @@
+<% if (user) { %><%- include('partials/top') %><% } else { %><%- include('partials/head') %><main class="conteudo"><% } %>
+<div class="card">
+  <h2><%= title %></h2>
+  <p class="mudo" style="margin-top:6px"><%= message %></p>
+  <p style="margin-top:14px"><a href="/admin">Voltar para a visão geral</a></p>
+</div>
+<% if (user) { %><%- include('partials/bottom') %><% } else { %></main></body></html><% } %>

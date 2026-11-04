@@ -1,0 +1,132 @@
+<%- include('partials/top') %>
+<%
+  const wa = fmt.waLink(lead.phone);
+  const conv = journey.find(function (v) { return v.converted; }) || null;
+  const antes = journey.filter(function (v) { return !v.after; });
+  const primeira = journey.length ? journey[0] : null;
+  const herdouDe = conv && conv.inherited ? journey.filter(function (v) { return !v.inherited && v.source !== '(direct)' && v.started_at < conv.started_at; }).pop() : null;
+  const dias = primeira ? Math.max(0, Math.round((lead.created_at - primeira.started_at) / 86400000)) : null;
+  const leitura = antes.reduce(function (s, v) { return s + v.engaged; }, 0);
+  const vazio = function (v) { return v == null || v === '' || v === '(none)' || v === '(direct)'; };
+  const origem = function (s, m) { return s === '(direct)' ? 'Direto (sem origem)' : s + ' / ' + m; };
+%>
+<div class="cabeca">
+  <div>
+    <p class="trilha"><a href="/admin/leads">Leads</a><% if (page) { %> · <a href="/admin/paginas/<%= page.id %>/leads"><%= page.name %></a><% } %></p>
+    <h1><%= lead.name || 'Sem nome' %></h1>
+    <p><%= fmt.datetime(lead.created_at) %> · <%= sourceLabel(lead.source) %><% if (primeira) { %> · <%= antes.length %> <%= antes.length === 1 ? 'visita' : 'visitas' %><%= dias ? ' em ' + dias + (dias === 1 ? ' dia' : ' dias') : '' %> até o contato<% } %></p>
+  </div>
+  <div class="cabeca__acoes">
+    <% if (wa) { %><a class="btn" href="<%= wa %>" target="_blank" rel="noopener">WhatsApp <%= lead.phone %></a><% } else if (lead.phone) { %><span class="selo"><%= lead.phone %></span><% } %>
+  </div>
+</div>
+
+<div class="grade-2">
+  <section class="card">
+    <div class="card__topo"><h2>Origem do contato</h2><p>É o que vai para o CRM.</p></div>
+    <dl class="ficha">
+      <div><dt>Canal</dt><dd><b><%= lead.channel ? (CHANNELS[lead.channel] || lead.channel) : 'Não identificado' %></b><% if (herdouDe) { %><small>Voltou direto; a origem é a da visita de <%= fmt.datetime(herdouDe.started_at) %>.</small><% } %></dd></div>
+      <div><dt>Origem / mídia</dt><dd class="mono"><%= vazio(lead.utm_source) ? 'Direto (sem origem)' : origem(lead.utm_source, lead.utm_medium) %></dd></div>
+      <div><dt>Campanha</dt><dd class="mono"><%= lead.utm_campaign || '-' %></dd></div>
+      <div><dt>Palavra-chave</dt><dd class="mono"><%= lead.utm_term || '-' %></dd></div>
+      <div><dt>Anúncio ou conteúdo</dt><dd class="mono"><%= lead.utm_content || '-' %></dd></div>
+      <div><dt>Clique do anúncio</dt><dd><% if (lead.click_id) { %><span class="copiar"><input type="text" id="clique" readonly value="<%= lead.click_id %>" aria-label="Identificador do clique (<%= lead.click_type %>)"><button type="button" class="btn sec peq" data-copiar="clique">Copiar</button></span><small><%= lead.click_type === 'gad' ? 'gad_campaignid (o Google não mandou o gclid)' : lead.click_type %></small><% } else { %>-<% } %></dd></div>
+      <div><dt>Entrou por</dt><dd class="mono"><%= lead.landing_page || lead.page_path || '-' %></dd></div>
+      <div><dt>Veio do site</dt><dd class="mono"><%= lead.referrer || '-' %></dd></div>
+      <div><dt>Aparelho</dt><dd><%= { celular: 'Celular', computador: 'Computador', tablet: 'Tablet' }[lead.device] || '-' %></dd></div>
+    </dl>
+  </section>
+
+  <section class="card">
+    <div class="card__topo"><h2>Primeiro contato</h2><p>A primeira visita desta pessoa ao site.</p></div>
+    <% if (primeira && primeira.converted) { %>
+      <dl class="ficha">
+        <div><dt>Quando</dt><dd><%= fmt.datetime(primeira.started_at) %></dd></div>
+      </dl>
+      <p class="mudo" style="margin-top:10px">Foi a mesma visita em que a pessoa entrou em contato: a origem é a do cartão ao lado.</p>
+    <% } else if (primeira) { %>
+      <dl class="ficha">
+        <div><dt>Quando</dt><dd><%= fmt.datetime(primeira.started_at) %></dd></div>
+        <div><dt>Canal</dt><dd><b><%= primeira.channel_label %></b></dd></div>
+        <div><dt>Origem / mídia</dt><dd class="mono"><%= origem(primeira.source, primeira.medium) %></dd></div>
+        <div><dt>Campanha</dt><dd class="mono"><%= primeira.campaign || '-' %></dd></div>
+        <div><dt>Palavra-chave</dt><dd class="mono"><%= primeira.term || '-' %></dd></div>
+        <div><dt>Anúncio ou conteúdo</dt><dd class="mono"><%= primeira.content || '-' %></dd></div>
+        <div><dt>Entrou por</dt><dd class="mono"><%= primeira.landing_path || '-' %></dd></div>
+        <div><dt>Veio do site</dt><dd class="mono"><%= primeira.referrer || '-' %></dd></div>
+      </dl>
+    <% } else if (lead.first_source) { %>
+      <dl class="ficha">
+        <div><dt>Quando</dt><dd><%= fmt.datetime(lead.first_seen) %></dd></div>
+        <div><dt>Origem / mídia</dt><dd class="mono"><%= origem(lead.first_source, lead.first_medium) %></dd></div>
+        <div><dt>Campanha</dt><dd class="mono"><%= lead.first_campaign || '-' %></dd></div>
+      </dl>
+    <% } else { %>
+      <p class="mudo">Sem visitas registradas: este lead é de antes da medição (que começou em <%= fmt.date(medicaoDesde) %>) ou veio de um navegador que bloqueia a medição. A origem ao lado saiu do endereço da página no envio.</p>
+    <% } %>
+  </section>
+</div>
+
+<% if (journey.length) { %>
+  <section class="card">
+    <div class="card__topo"><h2>Jornada</h2><p><%= journey.length %> <%= journey.length === 1 ? 'visita' : 'visitas' %> · <%= fmt.dur(leitura) %> de leitura até o contato</p></div>
+    <ol class="jornada">
+      <% journey.forEach(function (v) { %>
+        <li class="visita<%= v.converted ? ' converteu' : '' %><%= v.after ? ' depois' : '' %>">
+          <div class="visita__topo">
+            <b><%= fmt.datetime(v.started_at) %></b>
+            <% if (v.converted) { %><span class="selo ok">Converteu nesta visita</span><% } else if (v.after) { %><span class="selo">Depois do contato</span><% } %>
+            <% if (v.test) { %><span class="selo alerta">Teste</span><% } %>
+          </div>
+          <p class="visita__origem"><%= v.channel_label %> · <span class="mono"><%= origem(v.source, v.medium) %></span><% if (v.campaign) { %> · <span class="mono"><%= v.campaign %></span><% } %><% if (v.term) { %> · <span class="mono"><%= v.term %></span><% } %><% if (v.content) { %> · <span class="mono"><%= v.content %></span><% } %><% if (v.inherited) { %> <small>(voltou direto; origem herdada)</small><% } %></p>
+          <p class="pequeno"><%= { celular: 'Celular', computador: 'Computador', tablet: 'Tablet' }[v.device] || 'Aparelho não identificado' %> · <%= v.pages %> <%= v.pages === 1 ? 'página' : 'páginas' %> · <%= fmt.dur(v.engaged) %> de leitura<% if (v.referrer) { %> · veio de <span class="mono"><%= v.referrer %></span><% } %><% if (v.click_id) { %> · clique <span class="mono"><%= v.click_type %></span><% } %></p>
+          <ul class="eventos">
+            <% v.events.forEach(function (e) { const h = fmt.datetime(e.t).slice(11); %>
+              <% if (e.type === 'page') { %>
+                <li><span class="hora num"><%= h %></span><span>Abriu <b><%= e.name || e.path %></b> <small class="mono"><%= e.path %></small><small> · leu <%= fmt.dur(e.engaged) %> · viu <%= e.scroll %>% da página</small></span></li>
+              <% } else if (e.type === 'click') { %>
+                <li><span class="hora num"><%= h %></span><span>Clicou em <b><%= e.label || e.target || 'um botão' %></b><small> · <%= e.kind %><%= e.target && e.target !== e.label ? ' · ' + e.target : '' %></small></span></li>
+              <% } else { %>
+                <li class="evento-lead"><span class="hora num"><%= h %></span><span><b><%= e.self ? 'Enviou este contato' : 'Enviou outro contato' %></b><small> · <%= e.how %></small><% if (!e.self) { %> <a class="pequeno" href="/admin/leads/<%= e.id %>">abrir</a><% } %></span></li>
+              <% } %>
+            <% }) %>
+          </ul>
+          <% if (v.params.length) { %>
+            <details class="mais parametros">
+              <summary>Parâmetros do endereço de entrada</summary>
+              <%- include('partials/params', { params: v.params }) %>
+            </details>
+          <% } %>
+        </li>
+      <% }) %>
+    </ol>
+  </section>
+<% } %>
+
+<section class="card">
+  <div class="card__topo"><h2>Endereço da página no envio</h2><p>Todos os parâmetros que vieram no link.</p></div>
+  <% if (params.length) { %>
+    <%- include('partials/params', { params }) %>
+  <% } else { %>
+    <p class="mudo">O endereço não tinha parâmetros<%= lead.page_url ? '' : ' (o envio não informou o endereço)' %>.</p>
+  <% } %>
+  <% if (lead.page_url) { %>
+    <label style="margin-top:14px">Endereço completo
+      <span class="copiar"><input type="text" id="url-envio" readonly value="<%= lead.page_url %>"><button type="button" class="btn sec peq" data-copiar="url-envio">Copiar</button></span>
+    </label>
+  <% } %>
+</section>
+
+<section class="card">
+  <div class="card__topo"><h2>Envio</h2></div>
+  <dl class="ficha">
+    <div><dt>Botão ou formulário</dt><dd><%= sourceLabel(lead.source) %> <small class="mono"><%= lead.source || '' %></small></dd></div>
+    <% if (lead.message) { %><div><dt>Mensagem</dt><dd>“<%= lead.message %>”</dd></div><% } %>
+    <div><dt>CRM</dt><dd><% const st = lead.webhook_status; %><% if (!st) { %>-<% } else { %><span class="selo <%= st.indexOf('ok') === 0 ? 'ok' : (st === 'sem-webhook' ? '' : 'alerta') %>"><%= st.indexOf('ok') === 0 ? 'Enviado' : (st === 'sem-webhook' ? 'Sem webhook' : 'Falhou') %></span> <small class="mono"><%= st %></small><% } %></dd></div>
+    <div><dt>Navegador</dt><dd><small class="mono"><%= lead.user_agent || '-' %></small></dd></div>
+  </dl>
+  <form method="post" action="/admin/leads/<%= lead.id %>/delete" data-confirmar="Excluir o lead de <%= lead.name || 'sem nome' %>? Não dá para desfazer." style="margin-top:14px">
+    <button class="btn perigo peq">Excluir lead</button>
+  </form>
+</section>
+<%- include('partials/bottom') %>

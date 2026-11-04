@@ -1,0 +1,88 @@
+<%- include('partials/top') %>
+<% const dr = draft || {}; %>
+<div class="cabeca">
+  <div>
+    <h1>Usuários</h1>
+    <p>Quem pode entrar no painel. Admin vê resultados, leads e links; super admin também cuida de usuários, arquivos e domínio.</p>
+  </div>
+</div>
+
+<% if (shown) { %>
+  <div class="aviso destaque" role="status">
+    <p><b><%= shown.created ? 'Usuário criado.' : 'Senha provisória gerada.' %></b> Envie para <%= shown.name %> (<%= shown.email %>) por um canal seguro. Ela só aparece agora e vale até o primeiro acesso, quando a pessoa cria a própria senha.</p>
+    <span class="copiar" style="margin-top:10px;max-width:420px"><input type="text" id="senha-nova" readonly value="<%= shown.password %>"><button type="button" class="btn sec" data-copiar="senha-nova">Copiar</button></span>
+    <p class="pequeno" style="margin-top:8px">Endereço do painel: <%= panelUrl %></p>
+  </div>
+<% } %>
+
+<section class="card">
+  <div class="card__topo"><h2>Adicionar usuário</h2></div>
+  <form class="campos" method="post" action="/admin/usuarios" autocomplete="off">
+    <div class="campos linha">
+      <label>Nome <input type="text" name="name" value="<%= dr.name || '' %>" required maxlength="80"></label>
+      <label>E-mail <input type="email" name="email" value="<%= dr.email || '' %>" required autocomplete="off"></label>
+      <label>Papel
+        <select name="role">
+          <option value="admin" <%= dr.role !== 'super' ? 'selected' : '' %>>Admin</option>
+          <option value="super" <%= dr.role === 'super' ? 'selected' : '' %>>Super admin</option>
+        </select>
+      </label>
+      <label>Senha provisória
+        <span class="senha"><input type="text" id="senha-prov" name="password" autocomplete="new-password" placeholder="Vazio: o painel cria uma"><button type="button" data-gerar="senha-prov" hidden>Gerar</button></span>
+      </label>
+    </div>
+    <div class="acoes"><button class="btn">Adicionar</button><span class="pequeno">No primeiro acesso a pessoa troca a senha provisória pela dela.</span></div>
+  </form>
+</section>
+
+<section class="card">
+  <div class="card__topo"><h2><%= users.length %> <%= users.length === 1 ? 'usuário' : 'usuários' %></h2></div>
+  <div class="rolagem">
+    <table class="leads">
+      <thead><tr><th>Pessoa</th><th>Papel</th><th>Situação</th><th>Último acesso</th><th><span class="sr">Ações</span></th></tr></thead>
+      <tbody>
+        <% users.forEach(function (u) { const eu = u.id === user.id; %>
+          <tr>
+            <td data-r="Pessoa" class="quem"><b><%= u.name || '-' %><%= eu ? ' (você)' : '' %></b><small><%= u.email %></small></td>
+            <td data-r="Papel"><span><span class="selo <%= u.role === 'super' ? 'super' : '' %>"><%= u.role === 'super' ? 'Super admin' : 'Admin' %></span></span></td>
+            <td data-r="Situação"><span><% if (!u.active) { %><span class="selo alerta">Desativado</span><% } else if (u.must_change_password) { %><span class="selo">Aguardando primeiro acesso</span><% } else { %><span class="selo ok">Ativo</span><% } %></span></td>
+            <td data-r="Último acesso"><span><small title="<%= fmt.datetime(u.last_login_at) %>"><%= u.last_login_at ? fmt.rel(u.last_login_at) : 'nunca entrou' %></small></span></td>
+            <td>
+              <% if (!eu) { %>
+                <details class="mais">
+                  <summary>Gerenciar</summary>
+                  <div class="campos">
+                    <form class="campos linha" method="post" action="/admin/usuarios/<%= u.id %>">
+                      <label>Nome <input type="text" name="name" value="<%= u.name %>" maxlength="80"></label>
+                      <label>Papel
+                        <select name="role">
+                          <option value="admin" <%= u.role !== 'super' ? 'selected' : '' %>>Admin</option>
+                          <option value="super" <%= u.role === 'super' ? 'selected' : '' %>>Super admin</option>
+                        </select>
+                      </label>
+                      <div class="acoes"><button class="btn sec peq">Salvar</button></div>
+                    </form>
+                    <div class="acoes">
+                      <form method="post" action="/admin/usuarios/<%= u.id %>/senha" data-confirmar="Gerar uma senha provisória para <%= u.name %>? A senha atual deixa de valer e a pessoa sai do painel.">
+                        <button class="btn sec peq">Gerar senha provisória</button>
+                      </form>
+                      <form method="post" action="/admin/usuarios/<%= u.id %>/status"<% if (u.active) { %> data-confirmar="Desativar <%= u.name || u.email %>? A pessoa sai do painel na hora."<% } %>>
+                        <button class="btn sec peq"><%= u.active ? 'Desativar' : 'Reativar' %></button>
+                      </form>
+                      <form method="post" action="/admin/usuarios/<%= u.id %>/excluir" data-confirmar="Excluir <%= u.name || u.email %>? Não dá para desfazer.">
+                        <button class="btn perigo peq">Excluir</button>
+                      </form>
+                    </div>
+                  </div>
+                </details>
+              <% } else { %>
+                <a class="pequeno" href="/admin/conta">Minha conta</a>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<%- include('partials/bottom') %>

@@ -1,0 +1,93 @@
+<%- include('partials/top') %>
+<%
+  const comeco = status && status.first;
+  const antesDaMedicao = comeco && period.from < comeco;
+%>
+<div class="cabeca">
+  <div>
+    <h1>Visão geral</h1>
+    <p>Acessos, cliques, tempo e conversões das páginas no ar.</p>
+  </div>
+  <% if (status) { const ativo = status.last && Date.now() - status.last < 2 * 86400000; %>
+    <p class="status <%= ativo ? '' : 'parado' %>"><i aria-hidden="true"></i><%= status.last ? 'Medição ativa · último acesso ' + fmt.rel(status.last) : 'Medição ligada, aguardando o primeiro acesso' %></p>
+  <% } %>
+</div>
+
+<%- include('partials/period', { base: '/admin', resumo: antesDaMedicao ? 'Acessos medidos desde ' + fmt.date(comeco) + '. Leads de antes disso aparecem com a origem da URL.' : '' }) %>
+
+<% if (!rows.length) { %>
+  <div class="card vazio">Nenhuma página no ar ainda. Publique um site com domínio em <a href="/admin/site">Site e arquivos</a>.</div>
+<% } else { %>
+  <dl class="kpis">
+    <%- include('partials/kpi', { rotulo: 'Acessos', valor: fmt.int(total.visits), d: fmt.delta(total.visits, totalPrev.visits), sub: fmt.int(total.visitors) + ' pessoas' }) %>
+    <%- include('partials/kpi', { rotulo: 'Cliques em contato', valor: fmt.int(total.clicks), d: fmt.delta(total.clicks, totalPrev.clicks), sub: total.click_rate != null ? fmt.pct(total.click_rate) + ' dos acessos' : '' }) %>
+    <%- include('partials/kpi', { rotulo: 'Tempo médio na página', valor: fmt.dur(total.avg_ms), d: fmt.delta(total.avg_ms, totalPrev.avg_ms), sub: '' }) %>
+    <%- include('partials/kpi', { rotulo: 'Conversões', valor: fmt.int(total.conversions), d: fmt.delta(total.conversions, totalPrev.conversions), sub: total.untracked ? fmt.int(total.untracked) + ' sem dados de navegação' : (total.leads !== total.conversions ? fmt.int(total.leads) + ' envios' : '') }) %>
+    <%- include('partials/kpi', { rotulo: 'Taxa de conversão', valor: fmt.pct(total.rate), d: fmt.delta(total.rate, totalPrev.rate), sub: total.untracked ? 'só das visitas medidas' : 'conversões ÷ acessos' }) %>
+  </dl>
+
+  <section class="paginas" aria-label="Páginas">
+    <% rows.forEach(function (r, i) { const k = r.k, kp = r.kp; %>
+      <article class="card pag">
+        <div>
+          <div class="pag__nome"><i class="ponto <%= i < 3 ? 's' + (i + 1) : '' %>" aria-hidden="true"></i><h2><a href="/admin/paginas/<%= r.page.id %>"><%= r.page.name %></a></h2></div>
+          <p class="pag__url"><%= r.page.domain %><%= r.page.path === '/' ? '/' : r.page.path %></p>
+        </div>
+        <dl class="mini">
+          <% [['Acessos', fmt.int(k.visits), fmt.delta(k.visits, kp.visits)], ['Cliques', fmt.int(k.clicks), fmt.delta(k.clicks, kp.clicks)], ['Tempo médio', fmt.dur(k.avg_ms), null], ['Conversões', fmt.int(k.conversions) + (k.untracked ? '*' : ''), fmt.delta(k.conversions, kp.conversions)], ['Taxa', fmt.pct(k.rate), null], ['Leram até o fim', k.views ? fmt.pct(k.read_end / k.views, 0) : '-', null]].forEach(function (m) { %>
+            <div><dt><%= m[0] %></dt><dd><%= m[1] %><% if (m[2] && m[2].dir !== 'flat') { %><span class="delta <%= m[2].dir %>"><%= m[2].text %></span><% } %></dd></div>
+          <% }) %>
+        </dl>
+        <% if (k.untracked) { %><p class="pequeno">* <%= fmt.int(k.untracked) %> sem dados de navegação (de antes da medição): contam nas conversões, não na taxa.</p><% } %>
+        <footer>
+          <a class="btn sec peq" href="/admin/paginas/<%= r.page.id %>">Ver resultados</a>
+          <a class="pequeno" href="/admin/paginas/<%= r.page.id %>/leads">Leads desta página</a>
+        </footer>
+      </article>
+    <% }) %>
+  </section>
+
+  <% if (chartJson) { const c = JSON.parse(chartJson); %>
+    <section class="card">
+      <div class="card__topo"><h2>Acessos por <%= period.hourly ? 'hora' : 'dia' %></h2><p>Toque, passe o mouse ou use as setas para ver cada <%= period.hourly ? 'hora' : 'dia' %>.</p></div>
+      <% if (c.series.length > 1) { %>
+        <div class="legenda"><% c.series.forEach(function (s, i) { %><span><i class="<%= i ? 's' + (i + 1) : '' %>"></i><%= s.name %></span><% }) %></div>
+      <% } %>
+      <script type="application/json" id="dados-visao"><%- chartJson %></script>
+      <div class="grafico" data-grafico="linhas" data-dados="dados-visao" data-unidade="acessos" aria-label="Acessos por <%= period.hourly ? 'hora' : 'dia' %> de cada página"></div>
+      <details class="ver-tabela">
+        <summary>Ver em tabela</summary>
+        <div class="rolagem">
+          <table>
+            <thead><tr><th><%= period.hourly ? 'Hora' : 'Dia' %></th><% c.series.forEach(function (s) { %><th class="n"><%= s.name %></th><% }) %></tr></thead>
+            <tbody><% c.labels.forEach(function (l, i) { %><tr><td><%= l %></td><% c.series.forEach(function (s) { %><td class="n"><%= fmt.int(s.values[i]) %></td><% }) %></tr><% }) %></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+  <% } %>
+
+  <div class="grade-2">
+    <section class="card">
+      <div class="card__topo"><h2>De onde vêm os acessos</h2><a class="pequeno" href="/admin/paginas/<%= rows[0].page.id %>">Detalhar por página</a></div>
+      <% if (!canais.length) { %>
+        <p class="vazio">Sem acessos no período.</p>
+      <% } else { %>
+        <ul class="barras">
+          <% canais.forEach(function (c) { %>
+            <li>
+              <span class="nome"><%= c.label %></span>
+              <span class="val"><%= fmt.int(c.visits) %><small><%= c.conv ? fmt.int(c.conv) + (c.conv === 1 ? ' conversão' : ' conversões') : '' %></small></span>
+              <span class="trilho" aria-hidden="true"><i style="width:<%= Math.max(0.5, c.share * 100).toFixed(1) %>%"></i></span>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+    <section class="card">
+      <div class="card__topo"><h2>Leads recentes</h2><a class="pequeno" href="/admin/leads">Ver todos</a></div>
+      <%- include('partials/recent', { recent, mostrarPagina: rows.length > 1 }) %>
+    </section>
+  </div>
+<% } %>
+<%- include('partials/bottom') %>

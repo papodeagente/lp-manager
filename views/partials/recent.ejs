@@ -1,0 +1,14 @@
+<% if (!recent.length) { %>
+  <p class="vazio">Nenhum lead ainda.</p>
+<% } else { %>
+  <ul class="recentes">
+    <% recent.forEach(function (l) { const wa = fmt.waLink(l.phone); const extra = [l.utm_campaign, l.utm_term].filter(Boolean).join(' · '); %>
+      <li>
+        <b><a href="/admin/leads/<%= l.id %>"><%= l.name || 'Sem nome' %></a></b>
+        <span class="quando" title="<%= fmt.datetime(l.created_at) %>"><%= fmt.rel(l.created_at) %></span>
+        <% if (wa) { %><a href="<%= wa %>" target="_blank" rel="noopener"><%= l.phone %></a><% } else { %><small class="mudo"><%= l.phone || '' %></small><% } %>
+        <span class="origem"><%= l.channel ? (CHANNELS[l.channel] || l.channel) : 'Origem não identificada' %><% if (extra) { %> <small>· <%= extra %></small><% } %><% if (mostrarPagina && l.page_name) { %> <small>· <%= l.page_name %></small><% } %></span>
+      </li>
+    <% }) %>
+  </ul>
+<% } %>

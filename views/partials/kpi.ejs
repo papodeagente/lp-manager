@@ -1,0 +1,5 @@
+<div class="kpi">
+  <dt><%= rotulo %></dt>
+  <dd><%= valor %></dd>
+  <div class="sub"><% if (typeof d !== 'undefined' && d) { %><span class="delta <%= d.dir %>"><%= d.dir === 'up' ? '▲ ' : d.dir === 'down' ? '▼ ' : '' %><%= d.text %></span><span>vs. período anterior</span><% } %><% if (typeof sub !== 'undefined' && sub) { %><span><%= sub %></span><% } %></div>
+</div>

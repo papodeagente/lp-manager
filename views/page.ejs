@@ -1,0 +1,127 @@
+<%- include('partials/top') %>
+<%- include('partials/page-head') %>
+<%
+  const comeco = status && status.first;
+  const antesDaMedicao = comeco && period.from < comeco;
+  const c = JSON.parse(chartJson);
+  const unidade = period.hourly ? 'hora' : 'dia';
+%>
+<%- include('partials/period', { base: '/admin/paginas/' + page.id, resumo: antesDaMedicao ? 'Acessos medidos desde ' + fmt.date(comeco) + '.' : (status.last ? 'Último acesso ' + fmt.rel(status.last) : '') }) %>
+
+<dl class="kpis">
+  <%- include('partials/kpi', { rotulo: 'Acessos', valor: fmt.int(k.visits), d: fmt.delta(k.visits, kp.visits), sub: fmt.int(k.visitors) + ' pessoas · ' + fmt.int(k.views) + ' visualizações' }) %>
+  <%- include('partials/kpi', { rotulo: 'Cliques em contato', valor: fmt.int(k.clicks), d: fmt.delta(k.clicks, kp.clicks), sub: k.click_rate != null ? fmt.pct(k.click_rate) + ' dos acessos clicaram' : 'WhatsApp e formulário' }) %>
+  <%- include('partials/kpi', { rotulo: 'Tempo médio na página', valor: fmt.dur(k.avg_ms), d: fmt.delta(k.avg_ms, kp.avg_ms), sub: k.avg_scroll != null ? 'viram ' + k.avg_scroll + '% da página, em média' : '' }) %>
+  <%- include('partials/kpi', { rotulo: 'Conversões', valor: fmt.int(k.conversions), d: fmt.delta(k.conversions, kp.conversions), sub: k.untracked ? fmt.int(k.untracked) + ' sem dados de navegação' : (k.leads !== k.conversions ? fmt.int(k.leads) + ' envios de formulário' : 'formulário e WhatsApp') }) %>
+  <%- include('partials/kpi', { rotulo: 'Taxa de conversão', valor: fmt.pct(k.rate), d: fmt.delta(k.rate, kp.rate), sub: k.untracked ? 'só visitas medidas' : 'conversões ÷ acessos' }) %>
+</dl>
+
+<section class="card">
+  <div class="card__topo"><h2>Por <%= unidade %></h2><p>Toque, passe o mouse ou use as setas para ver cada <%= unidade %>.</p></div>
+  <script type="application/json" id="dados-pagina"><%- chartJson %></script>
+  <div class="graf-par">
+    <h3>Acessos</h3>
+    <div class="grafico" data-grafico="acessos" data-dados="dados-pagina" aria-label="Acessos por <%= unidade %>"></div>
+    <h3>Conversões</h3>
+    <div class="grafico" data-grafico="conversoes" data-dados="dados-pagina" aria-label="Conversões por <%= unidade %>"></div>
+  </div>
+  <details class="ver-tabela">
+    <summary>Ver em tabela</summary>
+    <div class="rolagem">
+      <table>
+        <thead><tr><th><%= period.hourly ? 'Hora' : 'Dia' %></th><th class="n">Acessos</th><th class="n">Conversões</th></tr></thead>
+        <tbody><% c.labels.forEach(function (l, i) { %><tr><td><%= l %></td><td class="n"><%= fmt.int(c.visits[i]) %></td><td class="n"><%= fmt.int(c.leads[i]) %></td></tr><% }) %></tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+<section class="card" data-dims>
+  <div class="card__topo"><h2>De onde vêm</h2><p>Acessos, conversões e taxa de cada origem.</p></div>
+  <div class="segm" role="group" aria-label="Agrupar por" hidden>
+    <% DIM_KEYS.forEach(function (key) { %><button type="button" data-dim-btn="<%= key %>" aria-pressed="false"><%= DIM_LABELS[key] %></button><% }) %>
+  </div>
+  <% DIM_KEYS.forEach(function (key) { const rows = dims[key]; %>
+    <div class="dim" data-dim="<%= key %>">
+      <h3><%= DIM_LABELS[key] %></h3>
+      <% if (!rows.length) { %>
+        <p class="vazio">Sem dados no período.</p>
+      <% } else { %>
+        <div class="rolagem">
+          <table>
+            <thead><tr><th><%= DIM_LABELS[key] %></th><th class="n">Acessos</th><th class="n">Conversões</th><th class="n">Taxa</th></tr></thead>
+            <tbody>
+              <% rows.forEach(function (r) { %>
+                <tr>
+                  <td><%= r.label %><div class="barra" style="width:<%= Math.max(0.5, r.share * 100).toFixed(1) %>%" aria-hidden="true"></div></td>
+                  <td class="n"><%= fmt.int(r.visits) %></td>
+                  <td class="n"><%= fmt.int(r.conv) %><%= r.conv > r.tconv ? '*' : '' %></td>
+                  <td class="n"><%= r.rate != null ? fmt.pct(r.rate) : '-' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  <% }) %>
+  <% if (k.untracked) { %><p class="pequeno" style="margin-top:10px">* Inclui conversões sem dados de navegação (de antes da medição ou de navegador que bloqueia a medição): a origem vem do endereço da página, e elas contam no total, mas não na taxa.</p><% } %>
+</section>
+
+<div class="grade-2">
+  <section class="card">
+    <div class="card__topo"><h2>Funil</h2><p>Das visitas que viram esta página.</p></div>
+    <% const funil = [['Acessaram a página', k.visits, 'o1'], ['Clicaram em WhatsApp ou formulário', k.visits_clicked, 'o2'], ['Converteram', k.tracked_conversions, 'o3']]; %>
+    <ul class="barras">
+      <% funil.forEach(function (f) { %>
+        <li>
+          <span class="nome"><%= f[0] %></span>
+          <span class="val"><%= fmt.int(f[1]) %><small><%= k.visits ? fmt.pct(f[1] / k.visits) : '' %></small></span>
+          <span class="trilho <%= f[2] %>" aria-hidden="true"><i style="width:<%= k.visits ? Math.max(0.5, f[1] / k.visits * 100).toFixed(1) : 0 %>%"></i></span>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+  <section class="card">
+    <div class="card__topo"><h2>Tempo na página</h2><p>Só conta com a página aberta na tela.</p></div>
+    <ul class="barras">
+      <% buckets.forEach(function (b, i) { %>
+        <li>
+          <span class="nome"><%= b.name %></span>
+          <span class="val"><%= fmt.pct(b.share, 0) %><small><%= fmt.int(b.n) %></small></span>
+          <span class="trilho b<%= i + 1 %>" aria-hidden="true"><i style="width:<%= Math.max(b.n ? 0.5 : 0, b.share * 100).toFixed(1) %>%"></i></span>
+        </li>
+      <% }) %>
+    </ul>
+    <p class="pequeno" style="margin-top:12px"><%= k.views ? fmt.pct(k.read_end / k.views, 0) + ' chegaram ao fim da página.' : '' %></p>
+  </section>
+</div>
+
+<div class="grade-2">
+  <section class="card">
+    <div class="card__topo"><h2>Onde clicam</h2><p>Botões e links mais clicados.</p></div>
+    <% if (!clicks.length) { %>
+      <p class="vazio">Nenhum clique no período.</p>
+    <% } else { %>
+      <div class="rolagem">
+        <table>
+          <thead><tr><th>Elemento</th><th class="n">Cliques</th><th class="n">Acessos</th></tr></thead>
+          <tbody>
+            <% clicks.forEach(function (x) { %>
+              <tr>
+                <td><%= x.label || x.target || '(sem texto)' %><br><small><%= CLICK_KINDS[x.kind] || x.kind %><%= x.target && x.target !== x.label ? ' · ' + x.target : '' %></small></td>
+                <td class="n"><%= fmt.int(x.n) %></td>
+                <td class="n"><%= fmt.int(x.visits) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+  <section class="card">
+    <div class="card__topo"><h2>Leads recentes</h2><a class="pequeno" href="/admin/paginas/<%= page.id %>/leads">Ver todos</a></div>
+    <%- include('partials/recent', { recent, mostrarPagina: false }) %>
+  </section>
+</div>
+<%- include('partials/bottom') %>

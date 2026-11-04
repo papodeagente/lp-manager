@@ -1,0 +1,94 @@
+<%- include('partials/top') %>
+<div class="cabeca">
+  <div>
+    <h1>Site e arquivos</h1>
+    <p>Parte técnica: arquivos publicados, domínio, páginas encontradas e o webhook geral dos leads.</p>
+  </div>
+</div>
+
+<% lps.forEach(function (lp) { const st = lp.status; %>
+  <section class="card">
+    <div class="card__topo">
+      <div>
+        <h2><%= lp.name %> <code class="selo"><%= lp.slug %></code></h2>
+        <p class="pequeno" style="margin-top:4px"><%= lp.files %> arquivos · <%= fmt.bytes(lp.size) %> · publicado em <%= fmt.datetime(lp.updated_at) %> · página inicial <code><%= lp.index_file %></code></p>
+      </div>
+      <div class="acoes">
+        <% if (lp.custom_domain) { %><a class="btn sec peq" href="https://<%= lp.custom_domain %>" target="_blank" rel="noopener"><%= lp.custom_domain %></a><% } else { %><span class="selo alerta">sem domínio</span><% } %>
+        <a class="btn sec peq" href="/p/<%= lp.slug %>/" target="_blank" rel="noopener">Prévia</a>
+      </div>
+    </div>
+
+    <% if (lp.custom_domain) { %>
+      <p class="status <%= st.last && Date.now() - st.last < 2 * 86400000 ? '' : 'parado' %>" style="margin-bottom:14px"><i aria-hidden="true"></i>Medição: <%= st.last ? 'último acesso ' + fmt.rel(st.last) : 'nenhum acesso medido ainda' %> · <%= fmt.int(st.day) %> nas últimas 24 h<%= st.test_day ? ' · ' + fmt.int(st.test_day) + ' de teste (fora dos números)' : '' %></p>
+    <% } %>
+
+    <div class="rolagem">
+      <table>
+        <thead><tr><th>Endereço</th><th>Página</th><th>Tipo</th><th>Arquivo</th></tr></thead>
+        <tbody>
+          <% lp.pages.forEach(function (p) { %>
+            <tr>
+              <td class="mono"><%= p.path %></td>
+              <td><% if (lp.custom_domain) { %><a href="/admin/paginas/<%= p.id %>"><%= p.name %></a><% } else { %><%= p.name %><% } %></td>
+              <td><%= p.kind === 'landing' ? 'Captação' : p.kind === 'thanks' ? 'Obrigado' : 'Outra' %><%= p.present ? '' : ' (removida no último upload)' %></td>
+              <td class="mono pequeno"><%= p.file %></td>
+            </tr>
+          <% }) %>
+          <% if (!lp.pages.length) { %><tr><td colspan="4" class="vazio">Nenhum HTML neste site.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <details class="mais" style="margin-top:16px">
+      <summary>Ações do site</summary>
+      <div class="grade-2">
+        <form class="campos" method="post" action="/admin/lps/<%= lp.slug %>/upload" enctype="multipart/form-data" data-confirmar="Substituir todos os arquivos de <%= lp.slug %> pelo ZIP escolhido? O site no ar muda na hora.">
+          <label>Publicar novo ZIP <span class="ajuda">Substitui todos os arquivos do site.</span><input type="file" name="zip" accept=".zip" required></label>
+          <div class="acoes"><button class="btn peq">Publicar ZIP</button><a class="pequeno" href="/admin/lps/<%= lp.slug %>/files" target="_blank" rel="noopener">Lista de arquivos</a></div>
+        </form>
+        <form class="campos" method="post" action="/admin/lps/<%= lp.slug %>/domain" data-confirmar="Alterar o domínio reinicia o servidor (cerca de 30 s fora do ar). Continuar?">
+          <label>Domínio público <span class="ajuda">Vazio remove. DNS A apontando para 187.127.6.135.</span><input type="text" name="domain" value="<%= lp.custom_domain || '' %>" placeholder="ex.: draglazi.com.br"></label>
+          <div class="acoes"><button class="btn sec peq">Salvar domínio</button></div>
+        </form>
+        <form class="campos" method="post" action="/admin/lps/<%= lp.slug %>/index-file">
+          <label>Página inicial (o que abre em "/")
+            <% if (lp.htmls && lp.htmls.length > 1) { %>
+              <select name="index_file"><% lp.htmls.forEach(function (h) { %><option value="<%= h %>" <%= h === lp.index_file ? 'selected' : '' %>><%= h %></option><% }) %></select>
+            <% } else { %>
+              <input type="text" name="index_file" value="<%= lp.index_file %>" class="mono">
+            <% } %>
+          </label>
+          <div class="acoes"><button class="btn sec peq">Salvar</button></div>
+        </form>
+        <div class="campos">
+          <form class="campos" method="post" action="/admin/lps/<%= lp.slug %>/webhook">
+            <label>Webhook geral dos leads <span class="ajuda">Vale para as páginas sem webhook próprio.</span><input type="url" name="webhook_url" value="<%= lp.webhook_url || '' %>" placeholder="https://seu-crm.com/webhook"></label>
+            <div class="acoes"><button class="btn sec peq">Salvar webhook</button><button class="btn sec peq" formaction="/admin/lps/<%= lp.slug %>/webhook/test">Testar</button></div>
+          </form>
+        </div>
+        <form class="campos" method="post" action="/admin/lps/<%= lp.slug %>/duplicate">
+          <label>Duplicar site <input type="text" name="new_slug" placeholder="novo-endereco (opcional)" pattern="[a-z0-9-]*"></label>
+          <div class="acoes"><button class="btn sec peq">Duplicar</button></div>
+        </form>
+        <form class="campos" method="post" action="/admin/lps/<%= lp.slug %>/delete" data-confirmar="Excluir o site <%= lp.slug %> e todos os arquivos? Não dá para desfazer.">
+          <label>Excluir site <span class="ajuda">Apaga os arquivos e tira o domínio. Leads e números ficam guardados.</span></label>
+          <div class="acoes"><button class="btn perigo peq">Excluir site</button></div>
+        </form>
+      </div>
+    </details>
+  </section>
+<% }) %>
+
+<section class="card">
+  <details class="mais">
+    <summary>Criar outro site</summary>
+    <form class="campos linha" method="post" action="/admin/lps" enctype="multipart/form-data">
+      <label>Nome <input type="text" name="name" required placeholder="Ex.: Campanha de verão"></label>
+      <label>Endereço interno <input type="text" name="slug" placeholder="opcional, sai do nome" pattern="[a-z0-9-]*"></label>
+      <label>ZIP (opcional) <input type="file" name="zip" accept=".zip"></label>
+      <div class="acoes"><button class="btn peq">Criar site</button></div>
+    </form>
+  </details>
+</section>
+<%- include('partials/bottom') %>

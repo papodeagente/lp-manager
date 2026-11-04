@@ -1,37 +1,23 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login · LP Manager</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-zinc-50 text-zinc-900 min-h-screen flex items-center justify-center px-4">
-  <div class="w-full max-w-sm">
-    <div class="mb-8 text-center">
-      <h1 class="text-2xl font-bold tracking-tight">LP Manager</h1>
-      <p class="text-sm text-zinc-500 mt-1">Acesso restrito</p>
-    </div>
-    <form method="post" action="/admin/login" class="bg-white rounded-2xl shadow-sm border border-zinc-200 p-6 space-y-4">
-      <% if (error) { %>
-        <div class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-          <%= error %>
-        </div>
-      <% } %>
-      <div>
-        <label class="block text-sm font-medium text-zinc-700 mb-1">Senha</label>
-        <input
-          type="password"
-          name="password"
-          required
-          autofocus
-          class="w-full rounded-lg border border-zinc-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-        >
-      </div>
-      <button type="submit" class="w-full bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg px-4 py-2 font-medium text-sm transition">
-        Entrar
-      </button>
+<%- include('partials/head') %>
+<main class="entrar">
+  <div class="entrar__caixa">
+    <div class="entrar__marca"><b><%= panelTitle %></b><span>painel das páginas</span></div>
+    <form class="card campos" method="post" action="/admin/login" autocomplete="on">
+      <% if (error) { %><div class="aviso alerta" role="alert"><%= error %></div><% } %>
+      <% if (noUsers) { %><div class="aviso alerta" role="alert">Nenhum usuário cadastrado ainda. Configure SUPERADMIN_EMAIL e SUPERADMIN_PASSWORD_HASH no servidor.</div><% } %>
+      <input type="hidden" name="next" value="<%= next %>">
+      <label>E-mail
+        <input type="email" name="email" value="<%= email %>" autocomplete="username" required <%- email ? '' : 'autofocus' %>>
+      </label>
+      <label>Senha
+        <span class="senha">
+          <input type="password" id="senha" name="password" autocomplete="current-password" required <%- email ? 'autofocus' : '' %>>
+          <button type="button" data-ver-senha="senha" aria-pressed="false" hidden>Mostrar</button>
+        </span>
+      </label>
+      <button class="btn">Entrar</button>
     </form>
   </div>
+</main>
 </body>
 </html>

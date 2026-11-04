@@ -1,0 +1,36 @@
+<%- include('partials/top') %>
+<div class="cabeca"><div><h1>Atividade</h1><p>Entradas no painel e alterações, das mais recentes para as mais antigas.</p></div></div>
+<div class="filtros" role="group" aria-label="Tipo">
+  <a class="chip" href="/admin/atividade" <%- tipo === '' ? 'aria-current="true"' : '' %>>Tudo</a>
+  <a class="chip" href="/admin/atividade?tipo=alteracoes" <%- tipo === 'alteracoes' ? 'aria-current="true"' : '' %>>Alterações</a>
+  <a class="chip" href="/admin/atividade?tipo=acessos" <%- tipo === 'acessos' ? 'aria-current="true"' : '' %>>Entradas e tentativas</a>
+</div>
+<section class="card">
+  <% if (!rows.length) { %>
+    <p class="vazio">Nada registrado<%= tipo ? ' deste tipo' : '' %>.</p>
+  <% } else { %>
+    <div class="rolagem">
+      <table class="leads">
+        <thead><tr><th>Quando</th><th>Quem</th><th>O quê</th><th>Detalhe</th><th>IP</th></tr></thead>
+        <tbody>
+          <% rows.forEach(function (r) { %>
+            <tr>
+              <td data-r="Quando" class="num"><span><%= fmt.datetime(r.created_at) %></span></td>
+              <td data-r="Quem"><span><%= r.user_email || '-' %></span></td>
+              <td data-r="O quê"><span><%= ACTIONS[r.action] || r.action %></span></td>
+              <td data-r="Detalhe"><span><small><%= r.detail || '' %></small></span></td>
+              <td data-r="IP" class="mono pequeno"><span><%= r.ip || '' %></span></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+  <% if (mais || !primeira) { %>
+    <div class="acoes" style="margin-top:14px">
+      <% if (!primeira) { %><a class="btn sec peq" href="/admin/atividade<%= tipo ? '?tipo=' + tipo : '' %>">Mais recentes</a><% } %>
+      <% if (mais) { %><a class="btn sec peq" href="/admin/atividade?<%= tipo ? 'tipo=' + tipo + '&' : '' %>antes=<%= mais %>">Mais antigas</a><% } %>
+    </div>
+  <% } %>
+</section>
+<%- include('partials/bottom') %>

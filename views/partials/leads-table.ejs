@@ -1,0 +1,30 @@
+<% if (!leads.length) { %>
+  <div class="card vazio">Nenhum lead com esses filtros. Quando alguém preencher o formulário ou o WhatsApp da página, aparece aqui.</div>
+<% } else { %>
+  <section class="card">
+    <div class="card__topo"><h2><%= fmt.int(leads.length) %> <%= leads.length === 1 ? 'lead' : 'leads' %><%= leads.length >= 500 ? ' (os 500 mais recentes)' : '' %></h2><a class="btn sec peq" href="<%= csvHref %>">Exportar planilha (CSV)</a></div>
+    <div class="rolagem">
+      <table class="leads">
+        <thead><tr><th>Data</th><th>Nome</th><% if (mostrarPagina) { %><th>Página</th><% } %><th>Origem</th><th>Campanha · palavra-chave</th><th>Primeiro contato</th><th>CRM</th><th><span class="sr">Ações</span></th></tr></thead>
+        <tbody>
+          <% leads.forEach(function (l) { const wa = fmt.waLink(l.phone); const camp = [l.utm_campaign, l.utm_term].filter(Boolean).join(' · '); const st = l.webhook_status; %>
+            <tr>
+              <td data-r="Data" class="num"><span><%= fmt.datetime(l.created_at) %></span></td>
+              <td data-r="Nome" class="quem"><b><a href="/admin/leads/<%= l.id %>"><%= l.name || 'Sem nome' %></a></b><% if (wa) { %><a href="<%= wa %>" target="_blank" rel="noopener"><%= l.phone %></a><% } else { %><small><%= l.phone || '' %></small><% } %><% if (l.message) { %><br><small>“<%= l.message %>”</small><% } %></td>
+              <% if (mostrarPagina) { %><td data-r="Página"><span><%= l.page_name || l.page_path || '-' %></span></td><% } %>
+              <td data-r="Origem"><span><%= l.channel ? (CHANNELS[l.channel] || l.channel) : '-' %><% if (l.utm_source && l.utm_source !== '(direct)') { %><br><small><%= l.utm_source %> / <%= l.utm_medium %></small><% } %></span></td>
+              <td data-r="Campanha · palavra-chave" class="<%= camp || l.utm_content ? '' : 'vazio-cel' %>"><span><%= camp || '-' %><% if (l.utm_content) { %><br><small><%= l.utm_content %></small><% } %></span></td>
+              <td data-r="Primeiro contato" class="<%= l.first_source ? '' : 'vazio-cel' %>"><span><% if (l.first_source) { %><%= l.first_source === '(direct)' ? 'Direto' : l.first_source + ' / ' + l.first_medium %><br><small><%= fmt.date(l.first_seen) %></small><% } else { %><small>-</small><% } %></span></td>
+              <td data-r="CRM" class="<%= st ? '' : 'vazio-cel' %>"><span><% if (!st) { %><small>-</small><% } else { %><span class="selo <%= st.indexOf('ok') === 0 ? 'ok' : (st === 'sem-webhook' ? '' : 'alerta') %>" title="Resposta do webhook: <%= st %>"><%= st.indexOf('ok') === 0 ? 'Enviado' : (st === 'sem-webhook' ? 'Sem webhook' : 'Falhou') %></span><% } %></span></td>
+              <td class="n">
+                <form method="post" action="/admin/leads/<%= l.id %>/delete" data-confirmar="Excluir o lead de <%= l.name || 'sem nome' %>? Não dá para desfazer.">
+                  <button class="btn perigo peq">Excluir</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+<% } %>

@@ -1,0 +1,55 @@
+<%- include('partials/top') %>
+<%- include('partials/page-head') %>
+<section class="card">
+  <div class="card__topo"><h2>Página</h2></div>
+  <form class="campos" method="post" action="/admin/paginas/<%= page.id %>/config">
+    <div class="campos linha">
+      <label>Nome no painel <input type="text" name="name" value="<%= page.name %>" maxlength="80" required></label>
+      <label>Tipo
+        <select name="kind">
+          <% Object.keys(KINDS).forEach(function (k) { %><option value="<%= k %>" <%= page.kind === k ? 'selected' : '' %>><%= KINDS[k] %></option><% }) %>
+        </select>
+        <span class="ajuda">Só as páginas de captação aparecem no menu e na visão geral.</span>
+      </label>
+    </div>
+    <% if (user.role === 'super') { %>
+      <label>Webhook dos leads desta página
+        <input type="url" name="webhook_url" value="<%= page.webhook_url || '' %>" placeholder="<%= lp.webhook_url ? 'Vazio: usa o webhook do site' : 'https://seu-crm.com/webhook' %>">
+        <span class="ajuda">Para mandar os leads desta página para outro funil do CRM. Vazio, vale o webhook do site. "Testar" envia um lead de teste para o endereço digitado, sem salvar.</span>
+      </label>
+    <% } else { %>
+      <p class="pequeno">Para onde vão os leads (webhook do CRM) é configurado pelo super admin.</p>
+    <% } %>
+    <div class="acoes">
+      <button class="btn">Salvar</button>
+      <% if (user.role === 'super') { %><button class="btn sec" formaction="/admin/paginas/<%= page.id %>/webhook/test">Testar webhook</button><% } %>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <div class="card__topo"><h2>O que o webhook recebe</h2></div>
+  <details class="mais">
+    <summary>Ver os campos enviados ao CRM</summary>
+    <pre class="mono rolagem" style="margin:0;font-size:12.5px;line-height:1.5">{
+  "event": "lead.created",
+  "page": "<%= page.path %>",
+  "page_name": "<%= page.name %>",
+  "name": "Maria", "phone": "5561999990000", "phone_e164": "+5561999990000",
+  "source": "botão ou formulário usado",
+  "utm_source": "google", "utm_medium": "cpc", "utm_campaign": "hipro_bsb",
+  "utm_term": "flacidez rosto", "utm_content": "rsa",
+  "utm": { "source": "...", "medium": "...", "campaign": "...", "term": "...", "content": "..." },
+  "channel": "Google Ads", "gclid": "...", "landing_page": "/", "referrer": "", "device": "celular",
+  "first_touch": { "source": "instagram", "medium": "social", "campaign": "perfil", "date": "..." },
+  "contact": { "name": "Maria", "phone": "5561999990000" }
+}</pre>
+  </details>
+</section>
+
+<section class="card">
+  <div class="card__topo"><h2>Não contar os seus acessos</h2></div>
+  <p class="mudo">Abra o endereço abaixo uma vez em cada celular ou computador da equipe. Daquele aparelho em diante, as visitas não entram nos números. Para voltar a contar, troque <code>off</code> por <code>on</code>.</p>
+  <span class="copiar" style="margin-top:12px"><input type="text" id="lpm-off" readonly value="<%= pageUrl %>?lpm=off"><button type="button" class="btn sec" data-copiar="lpm-off">Copiar</button></span>
+</section>
+<%- include('partials/bottom') %>

@@ -1,0 +1,14 @@
+<div class="rolagem">
+  <table class="params">
+    <thead><tr><th>O que é</th><th>Parâmetro</th><th>Valor</th></tr></thead>
+    <tbody>
+      <% params.forEach(function (x) { %>
+        <tr>
+          <td><%= x.label || 'Outro parâmetro' %></td>
+          <td class="mono"><%= x.key %></td>
+          <td class="mono valor"><%= x.value %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

@@ -1,0 +1,6 @@
+<%- include('partials/top') %>
+<%- include('partials/page-head') %>
+<% const extra = [f.canal ? 'canal=' + f.canal : '', f.busca ? 'q=' + encodeURIComponent(f.busca) : ''].filter(Boolean).join('&'); %>
+<%- include('partials/leads-filters', { base: '/admin/paginas/' + page.id + '/leads', extra, page }) %>
+<%- include('partials/leads-table', { mostrarPagina: false }) %>
+<%- include('partials/bottom') %>

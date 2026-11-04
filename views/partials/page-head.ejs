@@ -1,0 +1,12 @@
+<div class="cabeca">
+  <div>
+    <h1><%= page.name %></h1>
+    <p><a href="<%= 'https://' + page.domain + (page.path === '/' ? '/' : page.path) %>" target="_blank" rel="noopener"><%= page.domain %><%= page.path === '/' ? '/' : page.path %></a></p>
+  </div>
+</div>
+<nav class="abas" aria-label="Seções da página">
+  <a href="/admin/paginas/<%= page.id %>" <%- tab === 'resultados' ? 'aria-current="page"' : '' %>>Resultados</a>
+  <a href="/admin/paginas/<%= page.id %>/leads" <%- tab === 'leads' ? 'aria-current="page"' : '' %>>Leads</a>
+  <a href="/admin/paginas/<%= page.id %>/links" <%- tab === 'links' ? 'aria-current="page"' : '' %>>Links com UTM</a>
+  <a href="/admin/paginas/<%= page.id %>/config" <%- tab === 'config' ? 'aria-current="page"' : '' %>>Configurações</a>
+</nav>
