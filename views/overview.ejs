@@ -78,7 +78,7 @@
             <li>
               <span class="nome"><%= c.label %></span>
               <span class="val"><%= fmt.int(c.visits) %><small><%= c.conv ? fmt.int(c.conv) + (c.conv === 1 ? ' conversão' : ' conversões') : '' %></small></span>
-              <span class="trilho" aria-hidden="true"><i style="width:<%= Math.max(0.5, c.share * 100).toFixed(1) %>%"></i></span>
+              <span class="trilho" aria-hidden="true"><i style="width:<%= c.visits ? Math.max(0.5, c.share * 100).toFixed(1) : 0 %>%"></i></span>
             </li>
           <% }) %>
         </ul>
