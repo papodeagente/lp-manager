@@ -142,7 +142,7 @@ td.mono-kw{white-space:nowrap}
 .fontes{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:10px}
 .fontes li{display:grid;gap:2px;padding:10px 12px;border:1px solid var(--linha);border-radius:10px;background:var(--sup-2)}
 .fontes p{font-size:14px}
-.fontes a{font-size:12.5px;color:var(--tinta-3)}
+.fontes a,.fonte-sem-link{font-size:12.5px;color:var(--tinta-3)}
 .rodape-ia{display:grid;gap:10px}
 pre.json{max-height:420px;overflow:auto;background:var(--sup-2);border:1px solid var(--linha);border-radius:10px;padding:12px;font-size:12px;line-height:1.45;color:var(--tinta-2);white-space:pre-wrap;word-break:break-word}
 .btn.copiado{border-color:var(--ok);color:var(--ok)}
@@ -158,6 +158,7 @@ pre.json{max-height:420px;overflow:auto;background:var(--sup-2);border:1px solid
   table.novas td.mono-kw{white-space:normal;overflow-wrap:anywhere;font-weight:600;margin-bottom:4px}
   table.novas td[data-r]{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px}
   table.novas td[data-r]::before{content:attr(data-r);font-size:12px;color:var(--tinta-3);padding-top:1px}
+  table.novas td[data-r]>.selo{justify-self:start}
 }
 
 @media print{
@@ -168,6 +169,8 @@ pre.json{max-height:420px;overflow:auto;background:var(--sup-2);border:1px solid
   .conteudo{max-width:none;padding:0;display:block}
   .card{box-shadow:none}
   .anuncio,.grupo,.campanha__ficha,.kw-lista li,.recs li,.fontes li,.chips-neg li{break-inside:avoid}
+  /* título de seção não fica sozinho no pé da folha */
+  .card__topo,.resumo-ia__topo,.campanha__topo,.grupo__topo,.secao-titulo,.diag>h2{break-inside:avoid;break-after:avoid}
   td.mono-kw{white-space:normal;overflow-wrap:anywhere}
   .rolagem{overflow:visible}
 }

@@ -106,8 +106,18 @@ com pesquisa na web e resposta num formato fixo). Nenhum nome, telefone ou mensa
 tela do relatório mostra exatamente o que foi enviado. O relatório traz resumo, diagnóstico, palavras para
 investir, revisar, testar e negativar (com botão de copiar no formato do Google Ads), campanhas com grupos e
 anúncios (com contagem de caracteres), locais, horários, SEO, ajustes nas páginas, próximos passos, cuidados
-com as políticas e a pesquisa de mercado com as fontes. Um relatório por vez; se o servidor reiniciar no
-meio, ele continua acompanhando. No boot, o painel confere se a chave é aceita e se o modelo existe.
+com as políticas e a pesquisa de mercado com as fontes. Uma fonte só vira link quando o site dela apareceu
+na busca que a IA fez (a lista vem da OpenAI e fica guardada com o relatório); fora disso aparece como texto,
+"fonte não confirmada". Um relatório por vez; se o servidor reiniciar no meio, ele continua acompanhando
+(ao abrir a Central ou a tela do relatório). No boot, o painel confere se a chave é aceita e se o modelo
+existe; rede fora ou chave sem permissão de listar modelos não acusa chave recusada. O limite do dia
+(`INTEL_DAILY_LIMIT`) conta o que pode ter sido processado na OpenAI, e não o que falhou antes de sair do
+servidor.
+
+Textos que vêm de links e cliques (UTM, rótulo do clique, caminho de entrada) podem ser escritos por
+qualquer pessoa. Antes de irem para a IA, endereços e domínios viram "[endereço]", caracteres invisíveis
+saem e o valor é cortado no tamanho máximo; o prompt manda tratar esses campos como dados, nunca como
+instruções.
 
 Os dados não têm custo, impressões nem CTR (isso fica no Google Ads); o relatório é instruído a não
 inventar esses números e a tratar amostra pequena como sinal fraco.

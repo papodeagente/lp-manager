@@ -39,7 +39,7 @@
 </div>
 
 <% if (!geoStatus.ready) { %>
-  <div class="aviso alerta com-icone" role="status"><%- icon('alerta') %><span><%= geoStatus.error ? 'Não deu para baixar a base de localização (' + geoStatus.error + '). O servidor tenta de novo sozinho; enquanto isso, as visitas novas ficam sem cidade.' : 'A base de localização ainda está sendo baixada pelo servidor. As visitas novas ganham cidade assim que ela ficar pronta (alguns minutos depois do início).' %></span></div>
+  <div class="aviso alerta com-icone" role="status"><%- icon('alerta') %><span><%= geoStatus.disabled ? 'A localização está desligada no servidor (variável GEO_DISABLE=1). As visitas novas ficam sem cidade até ela ser ligada de novo.' : geoStatus.error ? 'Não deu para baixar a base de localização (' + geoStatus.error + '). O servidor tenta de novo sozinho; enquanto isso, as visitas novas ficam sem cidade.' : 'A base de localização ainda está sendo baixada pelo servidor. As visitas novas ganham cidade assim que ela ficar pronta (alguns minutos depois do início).' %></span></div>
 <% } %>
 
 <% if (!data) { %>

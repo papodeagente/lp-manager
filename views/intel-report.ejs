@@ -13,6 +13,10 @@
   const textoNovas = novas.map(function (p) { return matchSyntax(p.palavra, p.correspondencia); }).join('\n');
   const textoNeg = negativas.map(function (p) { return matchSyntax(p.palavra, p.correspondencia); }).join('\n');
   const buscas = sources && Array.isArray(sources.buscas) ? sources.buscas : [];
+  // a fonte só vira link quando o site apareceu na busca da IA (relatórios antigos não têm a lista)
+  const sitesDaBusca = sources && Array.isArray(sources.sites) ? sources.sites : null;
+  const fonteOk = function (u) { return u && (!sitesDaBusca || sitesDaBusca.indexOf(hostOf(u)) >= 0); };
+  const semWeb = r.web_search === 0;
   const segundos = usage && usage.segundos;
 %>
 <div class="cabeca">
@@ -31,7 +35,7 @@
     <span class="girando grande" aria-hidden="true"></span>
     <div>
       <h2>A IA está analisando os dados</h2>
-      <p>Ela lê os números do período, pesquisa a concorrência e monta as campanhas. Costuma levar de 3 a 10 minutos. Esta tela atualiza sozinha; pode sair e voltar depois.</p>
+      <p>Ela lê os números do período<%= semWeb ? '' : ', pesquisa a concorrência' %> e monta as campanhas. Costuma levar de 3 a 10 minutos. Esta tela atualiza sozinha; pode sair e voltar depois.</p>
       <p class="mudo pequeno" role="timer" data-tempo>Começou <%= fmt.rel(r.created_at) %>.</p>
     </div>
   </section>
@@ -55,6 +59,7 @@
       <% [['O que está funcionando', 'funciona', 'ok'], ['O que não está funcionando', 'nao_funciona', 'erro'], ['Oportunidades', 'oportunidades', 'alerta']].forEach(function (d) { %>
         <section class="card diag diag--<%= d[2] %>">
           <h2><%= d[0] %></h2>
+          <% if (!lista(o.diagnostico[d[1]]).length) { %><p class="vazio">Nada apontado pela IA.</p><% } %>
           <ul class="pontos"><% lista(o.diagnostico[d[1]]).forEach(function (t) { %><li><%= t %></li><% }) %></ul>
         </section>
       <% }) %>
@@ -231,10 +236,10 @@
 
   <% if (lista(o.pesquisa_de_mercado).length || buscas.length) { %>
     <section class="card" aria-labelledby="pesq-titulo">
-      <div class="card__topo"><div><h2 id="pesq-titulo">Pesquisa de mercado</h2><p>O que a IA encontrou na web, com a fonte.</p></div></div>
+      <div class="card__topo"><div><h2 id="pesq-titulo">Pesquisa de mercado</h2><p><%= semWeb ? 'Relatório gerado sem pesquisa na web: confira estes pontos antes de usar.' : 'O que a IA encontrou na web, com a fonte.' %></p></div></div>
       <ul class="fontes">
         <% lista(o.pesquisa_de_mercado).forEach(function (f) { const u = safeUrl(f.fonte_url); %>
-          <li><p><%= f.achado %></p><% if (u) { %><a href="<%= u %>" target="_blank" rel="noopener noreferrer nofollow"><%= hostOf(u) %></a><% } %></li>
+          <li><p><%= f.achado %></p><% if (u && fonteOk(u)) { %><a href="<%= u %>" target="_blank" rel="noopener noreferrer nofollow"><%= hostOf(u) %></a><% } else if (u) { %><span class="fonte-sem-link" title="Este site não apareceu na busca da IA; confira antes de abrir."><%= hostOf(u) %> (fonte não confirmada)</span><% } %></li>
         <% }) %>
       </ul>
       <% if (buscas.length) { %>

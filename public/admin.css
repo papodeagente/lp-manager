@@ -540,7 +540,8 @@ pre{font-family:var(--mono);font-size:12.5px}
   .conteudo{max-width:none;padding:0;display:block}
   .conteudo>*+*{margin-top:16px}
   .card,.kpi{border:1px solid var(--linha)}
-  .kpi,tr,li,.recentes li{break-inside:avoid}
-  .rolagem{overflow:visible}
+  .kpi,tr,li,.recentes li,.mini>div{break-inside:avoid}
+  /* a tabela aberta em "Ver em tabela" vai inteira (com o teto de 300 px ela saía por cima dos cartões seguintes) */
+  .rolagem,.ver-tabela .rolagem{overflow:visible;max-height:none}
   .entrar{background:none}
 }
