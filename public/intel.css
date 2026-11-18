@@ -90,6 +90,7 @@
 .diag--erro h2::before{background:var(--erro)}
 .diag--alerta h2::before{background:var(--alerta)}
 .pontos{margin:0;padding-left:18px;display:grid;gap:8px;color:var(--tinta-2);font-size:14px;line-height:1.5}
+.pontos li{overflow-wrap:anywhere;min-width:0}
 .pontos li::marker{color:var(--tinta-3)}
 .kw-lista{list-style:none;margin:0;padding:0;display:grid}
 .kw-lista li{display:grid;gap:3px;padding:12px 0;border-bottom:1px solid var(--grade)}
@@ -143,6 +144,7 @@ td.mono-kw{white-space:nowrap}
 .fontes li{display:grid;gap:2px;padding:10px 12px;border:1px solid var(--linha);border-radius:10px;background:var(--sup-2)}
 .fontes p{font-size:14px}
 .fontes a,.fonte-sem-link{font-size:12.5px;color:var(--tinta-3)}
+.fontes a{justify-self:start}
 .fonte-sem-link{overflow-wrap:anywhere}
 .rodape-ia{display:grid;gap:10px}
 pre.json{max-height:420px;overflow:auto;background:var(--sup-2);border:1px solid var(--linha);border-radius:10px;padding:12px;font-size:12px;line-height:1.45;color:var(--tinta-2);white-space:pre-wrap;word-break:break-word}
@@ -169,14 +171,17 @@ pre.json{max-height:420px;overflow:auto;background:var(--sup-2);border:1px solid
   body{background:#fff;color:#111}
   .conteudo{max-width:none;padding:0;display:block}
   .card{box-shadow:none}
-  /* o grupo de anúncios pode quebrar entre anúncios (inteiro, cada um empurrava meia folha em branco) */
-  .anuncio,.campanha__ficha,.kw-lista li,.recs li,.fontes li,.chips-neg li{break-inside:avoid}
+  /* o grupo de anúncios vai inteiro: quebrando dentro dele, o Chrome pintava o grupo seguinte
+     por cima das descrições em algumas margens */
+  .grupo,.anuncio,.campanha__ficha,.kw-lista li,.recs li,.fontes li,.chips-neg li{break-inside:avoid}
   /* listas em bloco no papel: item de grid não quebra bem entre folhas */
   .kw-lista,.recs,.pontos,.fontes{display:block}
   .fontes li+li{margin-top:10px}
   .pontos li+li{margin-top:8px}
   /* título de seção não fica sozinho no pé da folha */
   .card__topo,.resumo-ia__topo,.campanha__topo,.grupo__topo,.secao-titulo,.diag>h2{break-inside:avoid;break-after:avoid}
+  details.mais>summary{break-after:avoid}
+  details.mais>summary+*>:first-child{break-before:avoid}
   td.mono-kw{white-space:normal;overflow-wrap:anywhere}
   .rolagem{overflow:visible}
 }

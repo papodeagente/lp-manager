@@ -15,14 +15,26 @@
   const buscas = sources && Array.isArray(sources.buscas) ? sources.buscas : [];
   // a fonte só vira link quando o site apareceu na busca da IA (relatórios antigos não têm a lista)
   const sitesDaBusca = sources && Array.isArray(sources.sites) ? sources.sites : null;
+  const semLista = !!(sources && sources.sem_lista);
   const fonteOk = function (u) { return u && (!sitesDaBusca || sitesDaBusca.indexOf(hostOf(u)) >= 0); };
   const semWeb = r.web_search === 0;
-  const fontesPesq = lista(o.pesquisa_de_mercado).map(function (f) { const u = safeUrl(f.fonte_url); return { f: f, u: u, ok: !!u && fonteOk(u) }; });
-  const semConf = fontesPesq.filter(function (x) { return x.u && !x.ok; }).length;
-  const comConf = fontesPesq.filter(function (x) { return x.ok; }).length;
+  // endereço sem "https://" (ex.: "support.google.com/...") vale como https; o resto vai como texto
+  const urlDa = function (v) {
+    const s = String(v || '').trim();
+    return safeUrl(s) || (/^[^\s\/:@]+\.[^\s\/:@]+(\/\S*)?$/.test(s) ? safeUrl('https://' + s) : null);
+  };
+  const fontesPesq = lista(o.pesquisa_de_mercado).map(function (f) {
+    const bruto = String(f.fonte_url || '').trim(); const u = urlDa(bruto);
+    return { f: f, u: u, bruto: bruto, ok: !!u && fonteOk(u) };
+  });
+  const semConf = fontesPesq.filter(function (x) { return !x.ok; }).length;
+  const comConf = fontesPesq.length - semConf;
   const subPesq = semWeb ? 'Relatório gerado sem pesquisa na web: confira estes pontos antes de usar.'
-    : (semConf && !comConf) ? 'Nenhuma destas fontes apareceu na lista de sites da busca: confira cada uma antes de usar.'
-    : semConf ? 'O que a IA encontrou na web, com a fonte. A fonte que não apareceu na busca vem sem link.'
+    : !fontesPesq.length ? 'A IA pesquisou na web, mas não registrou achados neste relatório.'
+    : semLista ? 'Não deu para conferir as fontes desta vez: confira cada uma antes de usar.'
+    : (sitesDaBusca && !buscas.length) ? 'A IA não chegou a pesquisar na web neste relatório: confira cada fonte antes de usar.'
+    : !comConf ? 'Nenhuma destas fontes apareceu na lista de sites da busca: confira cada uma antes de usar.'
+    : semConf ? 'O que a IA encontrou na web. A fonte que não apareceu na busca vem sem link.'
     : 'O que a IA encontrou na web, com a fonte.';
   const segundos = usage && usage.segundos;
 %>
@@ -244,11 +256,13 @@
   <% if (lista(o.pesquisa_de_mercado).length || buscas.length) { %>
     <section class="card" aria-labelledby="pesq-titulo">
       <div class="card__topo"><div><h2 id="pesq-titulo">Pesquisa de mercado</h2><p><%= subPesq %></p></div></div>
+      <% if (fontesPesq.length) { %>
       <ul class="fontes">
         <% fontesPesq.forEach(function (x) { %>
-          <li><p><%= x.f.achado %></p><% if (x.ok) { %><a href="<%= x.u %>" target="_blank" rel="noopener noreferrer nofollow"><%= hostOf(x.u) %></a><% } else if (x.u) { %><span class="fonte-sem-link"><%= x.u %> · fonte não confirmada</span><% } %></li>
+          <li><p><%= x.f.achado %></p><% if (x.ok) { %><a href="<%= x.u %>" target="_blank" rel="noopener noreferrer nofollow"><%= hostOf(x.u) %></a><% } else if (x.u || x.bruto) { %><span class="fonte-sem-link"><%= x.u || x.bruto %> · fonte não confirmada</span><% } else { %><span class="fonte-sem-link">sem fonte informada</span><% } %></li>
         <% }) %>
       </ul>
+      <% } %>
       <% if (buscas.length) { %>
         <details class="mais"><summary>Buscas feitas pela IA (<%= buscas.length %>)</summary><ul class="pontos pequeno"><% buscas.forEach(function (b) { %><li><%= b %></li><% }) %></ul></details>
       <% } %>

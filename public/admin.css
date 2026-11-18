@@ -545,6 +545,9 @@ pre{font-family:var(--mono);font-size:12.5px}
      pintado por cima de uma linha de números na folha seguinte */
   .pag{break-inside:avoid}
   .card__topo,.graf-par>h3{break-inside:avoid;break-after:avoid}
+  /* barras em bloco: no grid o Chrome quebrava antes da primeira e o título ficava sozinho */
+  .barras{display:block}
+  .barras>li+li{margin-top:16px}
   /* a tabela aberta em "Ver em tabela" vai inteira (com o teto de 300 px ela saía por cima dos cartões seguintes) */
   .rolagem,.ver-tabela .rolagem{overflow:visible;max-height:none}
   .entrar{background:none}

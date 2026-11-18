@@ -20,7 +20,7 @@ Stack: Node 22, Express, SQLite (`better-sqlite3`) e EJS. Sem etapa de build. Da
 
 ## Onde fica o quê
 - `server.js`: entrada
-- `lib/`: lógica (`geo.js` localização, `insights.js` agregados do mapa e da IA, `intel.js` relatório da OpenAI, `central.js` rotas do Mapa e da Inteligência)
+- `lib/`: lógica (`geo.js` localização, `insights.js` agregados do mapa e da IA, `intel.js` relatório da OpenAI, `central.js` rotas do Mapa e da Inteligência, `tlds.js` lista de domínios da IANA usada na limpeza do texto que vai para a IA)
 - `views/`: templates EJS
 - `public/`: assets do painel
 - `scripts/`: utilitários (`seed-demo.js` cria um banco de demonstração local)

@@ -80,9 +80,16 @@
         + (canais.length ? '<span class="dica-canais">' + canais.map(function (c) {
           return esc(dados.channels[c[0]] || c[0]) + ' <b>' + nf.format(c[1].visits || 0) + '</b>';
         }).join(' · ') + '</span>' : '');
-      L.circleMarker([p.lat, p.lon], {
+      var marca = L.circleMarker([p.lat, p.lon], {
         pane: 'pontos', radius: raio(p[campo]), color: ponto, weight: 1.5, opacity: 0.95, fillColor: ponto, fillOpacity: 0.32,
-      }).bindTooltip(html, { className: 'mapa-dica', direction: 'top', offset: [0, -6], opacity: 1 }).addTo(grupo);
+      }).bindTooltip(html, { className: 'mapa-dica', direction: 'top', offset: [0, -6], opacity: 1 });
+      // pelo teclado (Tab), a cidade fora da área visível vem para dentro do mapa; o círculo só
+      // ganha elemento quando entra no mapa (depois que o mapa tem uma vista)
+      marca.on('add', function () {
+        var alvo = marca.getElement();
+        if (alvo) alvo.addEventListener('focus', function () { map.panInside(marca.getLatLng(), { padding: [70, 70], animate: false }); });
+      });
+      marca.addTo(grupo);
     });
 
     var vistas = {
