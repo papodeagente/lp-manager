@@ -107,8 +107,8 @@ td.mono-kw{white-space:nowrap}
 .campanha__verba{display:grid;justify-items:end;flex:none}
 .campanha__verba b{font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--acento-ia);line-height:1}
 .campanha__verba small{font-size:12px;color:var(--tinta-3)}
-.campanha__ficha{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:1px;margin:0;background:var(--linha);border:1px solid var(--linha);border-radius:12px;overflow:hidden}
-.campanha__ficha div{background:var(--sup);padding:10px 14px}
+.campanha__ficha{display:flex;flex-wrap:wrap;gap:1px;margin:0;background:var(--linha);border:1px solid var(--linha);border-radius:12px;overflow:hidden}
+.campanha__ficha div{flex:1 1 220px;background:var(--sup);padding:10px 14px}
 .campanha__ficha dt{font-size:12px;color:var(--tinta-3)}
 .campanha__ficha dd{margin:2px 0 0;font-size:13.5px;color:var(--tinta)}
 .grupo{border-top:1px solid var(--linha);padding-top:16px;display:grid;gap:12px}

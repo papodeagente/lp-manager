@@ -9,7 +9,7 @@ import { openDb } from '../lib/db.js';
 import { publicIp, fromRecord, ufOf } from '../lib/geo.js';
 import { geoColumns } from '../lib/tracking.js';
 import { makeInsights, pageText, placeLabel } from '../lib/insights.js';
-import { makeIntel, REPORT_SCHEMA, matchSyntax, safeUrl } from '../lib/intel.js';
+import { makeIntel, REPORT_SCHEMA, matchSyntax, safeUrl, cleanText, cleanOutput } from '../lib/intel.js';
 import { parsePeriod } from '../lib/stats.js';
 import { corta } from '../lib/format.js';
 
@@ -71,6 +71,16 @@ test('palavra no formato do Google Ads e link seguro', () => {
   assert.equal(corta('Harmonização Facial Full Face em Brasília', 20), 'Harmonização Facial…');
 });
 
+test('citações da busca saem do texto e o utm_source=openai sai dos endereços', () => {
+  const c = [];
+  assert.equal(cleanText('Botox está na lista. ([support.google.com](https://support.google.com/a?hl=pt-BR&utm_source=openai))', c), 'Botox está na lista.');
+  assert.deepEqual(c, ['https://support.google.com/a?hl=pt-BR']);
+  assert.equal(cleanText('Consulte [o Coren](https://coren-df.gov.br/) antes.'), 'Consulte o Coren antes.');
+  const { out, cited } = cleanOutput({ resumo: 'a ([x.com](https://x.com/?utm_source=openai)).', pesquisa_de_mercado: [{ achado: 'b', fonte_url: 'https://y.com/p?utm_source=openai' }], orcamento_pct: 70 });
+  assert.deepEqual(out, { resumo: 'a.', pesquisa_de_mercado: [{ achado: 'b', fonte_url: 'https://y.com/p' }], orcamento_pct: 70 });
+  assert.deepEqual(cited, ['https://x.com/']);
+});
+
 // ── banco de teste com visitas, cliques e leads ──────────────────────────────
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lpm-intel-'));
 const db = openDb(path.join(dir, 'lps.db'));
@@ -124,6 +134,10 @@ test('dados para a IA: palavras-chave, canais e nada pessoal', () => {
   assert.equal(d.totais.visitas, 20);
   assert.equal(d.busca_organica.totais.leads, 1);
   assert.equal(d.localizacao.sem_localizacao, 1);
+  assert.deepEqual(d.localizacao.cidades.find((c) => c.cidade === 'Goiânia · GO').canais, { 'Busca orgânica': { visitas: 4, leads: 1 } });
+  assert.deepEqual(d.google_ads.cidades.map((c) => [c.cidade, c.visitas, c.leads]), [['Brasília · DF', 15, 2]]);
+  assert.equal(d.google_ads.horas_do_dia.reduce((s, h) => s + h.visitas, 0), 15);
+  assert.ok(d.periodo_anterior && d.periodo_anterior.dias === 7);
   const s = JSON.stringify(d);
   assert.doesNotMatch(s, /"name"|telefone|phone/);
 });
