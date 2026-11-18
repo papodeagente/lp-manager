@@ -1,7 +1,10 @@
 <%- include('head') %>
 <%
-  // a cor da página aberta (a mesma da bolinha no menu) pinta os gráficos da tela
-  const iCor = (typeof page !== 'undefined' && page) ? navPages.findIndex(function (p) { return p.id === page.id; }) : -1;
+  // a cor da página aberta (a mesma da bolinha no menu) pinta os gráficos da tela;
+  // página sem cor própria fica neutra e as telas gerais usam o acento
+  const temPagina = typeof page !== 'undefined' && !!page;
+  const iCor = temPagina ? navPages.findIndex(function (p) { return p.id === page.id; }) : -1;
+  const classeCor = iCor >= 0 && iCor < 3 ? ' cor-' + (iCor + 1) : (temPagina ? ' cor-neutra' : '');
   const em = function (base) { return path === base || path.indexOf(base + '/') === 0; };
   const inicial = function (t) { return String(t || '?').trim().charAt(0).toUpperCase(); };
 %>
@@ -48,6 +51,6 @@
       </details>
     </div>
   </nav>
-  <main class="conteudo<%= iCor >= 0 && iCor < 3 ? ' cor-' + (iCor + 1) : '' %>" id="conteudo">
+  <main class="conteudo<%= classeCor %>" id="conteudo">
 <% if (flash) { %><div class="aviso ok com-icone" role="status"><%- icon('ok') %><span><%= flash %></span></div><% } %>
 <% if (flashWarn) { %><div class="aviso alerta com-icone" role="alert"><%- icon('alerta') %><span><%= flashWarn %></span></div><% } %>

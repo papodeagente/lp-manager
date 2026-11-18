@@ -18,17 +18,25 @@
     var s = d.getElementById(id);
     try { return s ? JSON.parse(s.textContent) : null; } catch (e) { return null; }
   }
-  // teto "redondo" para o eixo: 1, 2, 5 vezes potência de 10
-  function teto(max) {
-    if (max <= 4) return Math.max(1, Math.ceil(max));
-    var p = Math.pow(10, Math.floor(Math.log10(max))), r = max / p;
-    return (r <= 1 ? 1 : r <= 2 ? 2 : r <= 5 ? 5 : 10) * p;
+  // eixo: passo "redondo" e inteiro (1, 2, 2,5 ou 5 vezes potência de 10) e teto
+  // múltiplo dele, em no máximo "lim" faixas; as marcas ficam igualmente espaçadas
+  function escala(max, lim) {
+    lim = lim || 4;
+    for (var p = 1; p < 1e12; p *= 10) {
+      var ms = [1, 2, 2.5, 5];
+      for (var j = 0; j < ms.length; j++) {
+        var passo = ms[j] * p;
+        if (passo % 1) continue;
+        var n = Math.max(1, Math.ceil(max / passo));
+        if (n > lim) continue;
+        var ticks = [];
+        for (var i = 0; i <= n; i++) ticks.push(i * passo);
+        return { top: n * passo, ticks: ticks };
+      }
+    }
+    return { top: max, ticks: [0, max] };
   }
-  function marcas(top) {
-    var n = top <= 4 ? top : 4, out = [];
-    for (var i = 0; i <= n; i++) out.push(Math.round(top * i / n));
-    return out.filter(function (v, i, a) { return a.indexOf(v) === i; });
-  }
+  var nGrad = 0;
   function compacto(v) {
     return v >= 10000 ? nf.format(Math.round(v / 1000)) + ' mil' : nf.format(v);
   }
@@ -66,11 +74,12 @@
     var H = cfg.altura || 220;
     var max = 0;
     series.forEach(function (s) { s.values.forEach(function (v) { if (v > max) max = v; }); });
-    var top = teto(max), ticks = marcas(top);
+    var esc = escala(max, 4), top = esc.top, ticks = esc.ticks;
     var svgHolder = d.createElement('div');
     box.appendChild(svgHolder);
     var tip = dica(box);
     var idx = -1;
+    var grad = 'grad-' + (++nGrad);
 
     function desenha() {
       var W = Math.max(280, box.clientWidth);
@@ -91,14 +100,21 @@
       var serie = function (k) { return series.length > 1 && k < 3 ? 's' + (k + 1) : ''; };
       series.forEach(function (s, k) {
         var cls = serie(k), pts = s.values.map(function (v, i) { return X(i).toFixed(1) + ',' + Y(v).toFixed(1); });
-        if (series.length === 1 && n > 1) el('path', { d: 'M' + X(0) + ',' + Y(0) + ' L' + pts.join(' L') + ' L' + X(n - 1) + ',' + Y(0) + ' Z', 'class': 'area' }, svg);
+        if (series.length === 1 && n > 1) {
+          // área em degradê da cor da série até transparente, do pico até a base
+          var lg = el('linearGradient', { id: grad, x1: 0, y1: 0, x2: 0, y2: 1 }, el('defs', {}, svg));
+          el('stop', { offset: 0, 'class': 'grad-topo' }, lg);
+          el('stop', { offset: 0.55, 'class': 'grad-meio' }, lg);
+          el('stop', { offset: 1, 'class': 'grad-base' }, lg);
+          el('path', { d: 'M' + X(0) + ',' + Y(0) + ' L' + pts.join(' L') + ' L' + X(n - 1) + ',' + Y(0) + ' Z', 'class': 'area', fill: 'url(#' + grad + ')' }, svg);
+        }
         if (n > 1) el('polyline', { points: pts.join(' '), 'class': 'linha ' + cls }, svg);
         var last = s.values[n - 1];
         el('circle', { cx: X(n - 1), cy: Y(last), r: 4, 'class': 'ponto-fim ' + cls }, svg);
         if (series.length === 1) el('text', { x: X(n - 1) + 9, y: Y(last) + 4, 'class': 'rotulo' }, svg).textContent = compacto(last);
       });
       var mira = el('line', { y1: topo, y2: topo + ph, 'class': 'mira', visibility: 'hidden' }, svg);
-      var pontos = series.map(function (s, k) { return el('circle', { r: 4, 'class': 'ponto-fim ' + serie(k), visibility: 'hidden' }, svg); });
+      var pontos = series.map(function (s, k) { return el('circle', { r: 5, 'class': 'ponto-mira ' + serie(k), visibility: 'hidden' }, svg); });
       function mostra(i) {
         idx = i;
         var x = X(i);
@@ -139,20 +155,25 @@
   // colunas finas (até 24 px), canto arredondado só na ponta de cima
   function colunas(box, cfg) {
     var vals = cfg.values, labels = cfg.labels, n = vals.length, H = cfg.altura || 130;
-    var max = Math.max.apply(null, vals.concat([0])), top = teto(max), ticks = marcas(top);
+    var max = Math.max.apply(null, vals.concat([0])), esc = escala(max, 3), top = esc.top, ticks = esc.ticks;
     var holder = d.createElement('div');
     box.appendChild(holder);
     var tip = dica(box), mostras = [], atual = -1;
+    // a coluna com a dica aberta fica acesa e as outras esmaecem
+    function acende(i) {
+      holder.querySelectorAll('.coluna').forEach(function (c) { c.classList.toggle('ativa', c.getAttribute('data-i') === String(i)); });
+    }
+    function apaga() { atual = -1; tip.esconde(); acende(-1); }
     box.tabIndex = 0;
     box.onkeydown = function (e) {
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         e.preventDefault();
         var i = Math.max(0, Math.min(n - 1, (atual < 0 ? n - 1 : atual) + (e.key === 'ArrowRight' ? 1 : -1)));
         if (mostras[i]) mostras[i]();
-      } else if (e.key === 'Escape') { atual = -1; tip.esconde(); }
+      } else if (e.key === 'Escape') apaga();
     };
-    box.onblur = function () { atual = -1; tip.esconde(); };
-    toqueFora(box, function () { atual = -1; tip.esconde(); });
+    box.onblur = apaga;
+    toqueFora(box, apaga);
     function desenha() {
       var W = Math.max(280, box.clientWidth);
       holder.textContent = '';
@@ -174,14 +195,14 @@
           el('path', {
             d: 'M' + x + ',' + Y(0) + ' V' + (y + r) + ' Q' + x + ',' + y + ' ' + (x + r) + ',' + y + ' H' + (x + bw - r) +
               ' Q' + (x + bw) + ',' + y + ' ' + (x + bw) + ',' + (y + r) + ' V' + Y(0) + ' Z',
-            'class': 'coluna',
+            'class': 'coluna', 'data-i': i,
           }, svg);
         }
         var hit = el('rect', { x: left + banda * i, y: topo, width: banda, height: ph, fill: 'transparent' }, svg);
-        mostras[i] = function () { atual = i; tip.mostra(labels[i], [{ valor: nf.format(v), nome: cfg.unidade || '' }], cx, y); };
+        mostras[i] = function () { atual = i; acende(i); tip.mostra(labels[i], [{ valor: nf.format(v), nome: cfg.unidade || '' }], cx, y); };
         hit.addEventListener('pointerenter', mostras[i]);
         hit.addEventListener('pointerdown', function (e) { if (e.pointerType !== 'mouse') mostras[i](); });
-        hit.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') tip.esconde(); });
+        hit.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') { tip.esconde(); acende(-1); } });
       });
       if (!max && cfg.vazio) {
         el('text', { x: left + pw / 2, y: topo + ph / 2, 'text-anchor': 'middle', 'class': 'eixo' }, svg).textContent = cfg.vazio;
