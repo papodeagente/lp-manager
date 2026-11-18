@@ -18,6 +18,8 @@
     <div class="lateral__grupo">
       <a class="item" href="/admin" <%- path === '/admin' ? 'aria-current="page"' : '' %>><%- icon('painel') %><span>Visão geral</span></a>
       <a class="item" href="/admin/leads" <%- em('/admin/leads') ? 'aria-current="page"' : '' %>><%- icon('leads') %><span>Leads</span></a>
+      <a class="item" href="/admin/inteligencia" <%- em('/admin/inteligencia') ? 'aria-current="page"' : '' %>><%- icon('inteligencia') %><span>Inteligência</span></a>
+      <a class="item" href="/admin/mapa" <%- em('/admin/mapa') ? 'aria-current="page"' : '' %>><%- icon('mapa') %><span>Mapa</span></a>
     </div>
     <% if (navPages.length) { %>
       <div class="lateral__grupo">

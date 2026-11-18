@@ -16,10 +16,11 @@ import {
 import { webhookProblem, postJson } from './lib/webhook.js';
 import { makePages, pathOfUrl } from './lib/pages.js';
 import {
-  makeTracking, ensureVisitor, visitorOf, isBot, eventRateOk, injectTracker, trackerVersion,
+  makeTracking, geoColumns, ensureVisitor, visitorOf, isBot, eventRateOk, injectTracker, trackerVersion,
   leadAttributionFromUrl, deviceOf, parseCookies, CHANNELS,
 } from './lib/tracking.js';
 import { makeStats } from './lib/stats.js';
+import { makeGeo } from './lib/geo.js';
 import * as fmt from './lib/format.js';
 import { registerAdmin } from './lib/admin.js';
 import { icon } from './lib/icons.js';
@@ -67,17 +68,43 @@ const stmts = {
 const leadStmts = {
   insert: db.prepare(`INSERT INTO leads (slug, name, phone, message, source, page_url, user_agent, ip, webhook_status, created_at,
       page_id, page_path, visit_id, visitor_id, utm_source, utm_medium, utm_campaign, utm_term, utm_content, click_type, click_id,
-      channel, referrer, landing_page, device, first_source, first_medium, first_campaign, first_seen, test)
+      channel, referrer, landing_page, device, first_source, first_medium, first_campaign, first_seen, test,
+      geo_country, geo_region, geo_city, geo_lat, geo_lon)
     VALUES (@slug, @name, @phone, @message, @source, @page_url, @user_agent, @ip, @webhook_status, @created_at,
       @page_id, @page_path, @visit_id, @visitor_id, @utm_source, @utm_medium, @utm_campaign, @utm_term, @utm_content, @click_type, @click_id,
-      @channel, @referrer, @landing_page, @device, @first_source, @first_medium, @first_campaign, @first_seen, @test)`),
+      @channel, @referrer, @landing_page, @device, @first_source, @first_medium, @first_campaign, @first_seen, @test,
+      @geo_country, @geo_region, @geo_city, @geo_lat, @geo_lon)`),
   countBySlug: db.prepare('SELECT COUNT(*) AS n FROM leads WHERE slug = ?'),
   setStatus: db.prepare('UPDATE leads SET webhook_status = ?, webhook_at = ? WHERE id = ?'),
 };
 const setWebhookUrl = db.prepare('UPDATE lps SET webhook_url = ? WHERE slug = ?');
 
 const pages = makePages(db);
-const tracking = makeTracking(db, pages);
+// Localização aproximada: quando a base abre (boot ou base nova do mês), completa os
+// leads antigos que têm IP e passa a cidade do lead para a visita que converteu.
+const geoFill = {
+  leads: db.prepare('SELECT id, ip FROM leads WHERE geo_country IS NULL AND ip IS NOT NULL AND ip != \'\' LIMIT 500'),
+  setLead: db.prepare(`UPDATE leads SET geo_country = @geo_country, geo_region = @geo_region, geo_city = @geo_city,
+    geo_lat = @geo_lat, geo_lon = @geo_lon WHERE id = @id`),
+  visits: db.prepare(`UPDATE visits SET (geo_country, geo_region, geo_city, geo_lat, geo_lon) =
+      (SELECT l.geo_country, l.geo_region, l.geo_city, l.geo_lat, l.geo_lon FROM leads l
+        WHERE l.visit_id = visits.id AND l.geo_country IS NOT NULL ORDER BY l.created_at LIMIT 1)
+    WHERE geo_country IS NULL AND EXISTS (SELECT 1 FROM leads l WHERE l.visit_id = visits.id AND l.geo_country IS NOT NULL)`),
+};
+function backfillGeo() {
+  let n = 0;
+  // cada lead procurado sai da lista (cidade achada ou país ''); sem base, para
+  while (geo.ready()) {
+    const rows = geoFill.leads.all();
+    if (!rows.length) break;
+    db.transaction(() => { for (const r of rows) geoFill.setLead.run({ id: r.id, ...geoColumns(geo, r.ip) }); })();
+    n += rows.length;
+  }
+  const v = geoFill.visits.run().changes;
+  if (n || v) console.log(`[geo] localização completada em ${n} lead(s) e ${v} visita(s)`);
+}
+const geo = makeGeo({ dataDir: DATA_DIR, onReady: () => { try { backfillGeo(); } catch (e) { console.error('[geo] completar:', e.message); } } });
+const tracking = makeTracking(db, pages, geo);
 const stats = makeStats(db);
 const LEAD_FIELDS = ['page_id', 'page_path', 'visit_id', 'visitor_id', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term',
   'utm_content', 'click_type', 'click_id', 'channel', 'referrer', 'landing_page', 'device', 'first_source', 'first_medium',
@@ -754,6 +781,7 @@ app.post('/api/lead', ah(async (req, res) => {
       ip, webhook_status: null, created_at: now,
       ...Object.fromEntries(LEAD_FIELDS.map((k) => [k, null])),
       test: 0,
+      ...geoColumns(geo, ip),
     };
     try {
       Object.assign(lead, tracking.attributeLead(lp, visitorOf(req), pageUrl, now));
@@ -807,7 +835,7 @@ app.post('/_lpm/e', express.text({ type: () => true, limit: '16kb' }), (req, res
     if (!lp) return res.status(204).end();
     let ev;
     try { ev = JSON.parse(typeof req.body === 'string' ? req.body : ''); } catch (_) { return res.status(204).end(); }
-    tracking.record(lp, ensureVisitor(req, res), ev, ua, Date.now());
+    tracking.record(lp, ensureVisitor(req, res), ev, ua, Date.now(), clientIp(req));
   } catch (e) {
     console.error('[medicao]', e.message);
   }
@@ -1310,6 +1338,8 @@ seedSuperAdmin();
 bootData();
 pruneTracking();
 setInterval(pruneTracking, 24 * 3600 * 1000).unref();
+
+geo.start();
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`lp-manager listening on :${PORT}`);
