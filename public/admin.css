@@ -31,7 +31,7 @@
   --sombra-1:inset 0 1px 0 rgba(236,243,238,.035);
   --sombra-2:0 1px 2px rgba(0,0,0,.45);
   --sombra-3:0 24px 48px -18px rgba(0,0,0,.75),0 8px 18px -8px rgba(0,0,0,.5);
-  --raio:20px;--raio-m:14px;--raio-p:10px;
+  --raio:20px;--raio-m:14px;
   --sans:'Figtree',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
