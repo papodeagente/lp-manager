@@ -115,9 +115,11 @@ existe; rede fora ou chave sem permissão de listar modelos não acusa chave rec
 servidor.
 
 Textos que vêm de links e cliques (UTM, rótulo do clique, caminho de entrada) podem ser escritos por
-qualquer pessoa. Antes de irem para a IA, endereços e domínios viram "[endereço]", caracteres invisíveis
-saem e o valor é cortado no tamanho máximo; o prompt manda tratar esses campos como dados, nunca como
-instruções.
+qualquer pessoa. No pacote para a IA (só nele: a tela da Central mostra os valores como são), endereço não
+chega inteiro: o ponto vira `[.]` e o dois-pontos vira `[:]` (`evil[.]com`), caracteres invisíveis saem e o
+valor é cortado no tamanho máximo. Conta como endereço o que tem esquema, `//`, `www.`, IP ou termina num
+domínio real; nome de campanha com ponto (`bsb.search.botox`) fica como está. O prompt manda tratar esses
+campos como dados, nunca como instruções.
 
 Os dados não têm custo, impressões nem CTR (isso fica no Google Ads); o relatório é instruído a não
 inventar esses números e a tratar amostra pequena como sinal fraco.
