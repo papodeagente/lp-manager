@@ -49,6 +49,9 @@
     <% } else if (!cfg.key) { %>
       <div class="aviso alerta com-icone"><%- icon('alerta') %><span><%= user.role === 'super' ? 'A IA ainda não está ligada: falta a chave da OpenAI no servidor (variável OPENAI_API_KEY).' : 'A IA ainda não está ligada. Peça ao administrador do painel.' %></span></div>
     <% } else { %>
+      <% if (health && health.ok === false && health.error) { %>
+        <div class="aviso alerta com-icone"><%- icon('alerta') %><span><%= health.error %></span></div>
+      <% } %>
       <form class="ia__form" method="post" action="/admin/inteligencia/relatorios" data-enviando="Enviando para a IA...">
         <input type="hidden" name="p" value="<%= period.key %>">
         <input type="hidden" name="de" value="<%= period.de %>">

@@ -15,13 +15,15 @@ Stack: Node 22, Express, SQLite (`better-sqlite3`) e EJS. Sem etapa de build. Da
 - `SUPERADMIN_EMAIL`: dono do painel. É criado (ou reativado) a cada boot.
 - `SUPERADMIN_PASSWORD_HASH`: hash da senha, nunca a senha. Gere com `node scripts/hash-password.js`.
 - `SUPERADMIN_NAME`: opcional
+- `OPENAI_API_KEY`: relatórios da Central de Inteligência (`INTEL_MODEL`, `INTEL_EFFORT`, `INTEL_WEB_SEARCH`, `INTEL_DAILY_LIMIT` opcionais)
+- `GEO_DB_FILE`, `GEO_DB_URL`, `GEO_DISABLE`: base de localização (opcionais; o padrão baixa a DB-IP do mês)
 
 ## Onde fica o quê
 - `server.js`: entrada
-- `lib/`: lógica
+- `lib/`: lógica (`geo.js` localização, `insights.js` agregados do mapa e da IA, `intel.js` relatório da OpenAI, `central.js` rotas do Mapa e da Inteligência)
 - `views/`: templates EJS
 - `public/`: assets do painel
-- `scripts/`: utilitários
+- `scripts/`: utilitários (`seed-demo.js` cria um banco de demonstração local)
 - `test/`: testes
 
 ## Comandos
