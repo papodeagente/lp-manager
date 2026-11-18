@@ -1,0 +1,164 @@
+<%- include('partials/top') %>
+<link rel="stylesheet" href="/admin/static/intel.css?v=<%= assetV %>">
+<script src="/admin/static/intel.js?v=<%= assetV %>" defer></script>
+<%
+  const base = '/admin/inteligencia';
+  const ads = data ? data.google_ads : null;
+  const org = data ? data.busca_organica : null;
+  const pctN = function (x) { return x == null ? '-' : fmt.pct(x / 100); };
+  const STATUS = { preparando: ['Preparando', 'alerta'], gerando: ['Gerando', 'alerta'], pronto: ['Pronto', 'ok'], erro: ['Não concluiu', 'erro'] };
+  const palavras = ads ? ads.palavras_chave.filter(function (p) { return p.palavra_chave !== '(sem palavra-chave)'; }) : [];
+  const ordenadas = palavras.slice().sort(function (a, b) { return b.leads - a.leads || b.visitas - a.visitas; });
+  const maxV = palavras.reduce(function (m, p) { return Math.max(m, p.visitas); }, 0) || 1;
+  const semTermo = ads ? ads.palavras_chave.find(function (p) { return p.palavra_chave === '(sem palavra-chave)'; }) : null;
+%>
+<div class="cabeca">
+  <div>
+    <h1>Central de Inteligência</h1>
+    <p>Palavras-chave, canais e cidades que trazem pacientes, e um relatório da IA com as próximas campanhas do Google.</p>
+  </div>
+  <div class="cabeca__acoes">
+    <a class="btn sec" href="/admin/mapa?p=<%= period.key %><%= sel ? '&pg=' + sel.id : '' %>"><%- icon('mapa') %>Ver no mapa</a>
+  </div>
+</div>
+
+<%- include('partials/period', { base: base, extra: extra, hidden: { pg: sel ? sel.id : '' } }) %>
+<% if (live.length > 1) { %>
+  <div class="filtros">
+    <div class="segmento" role="group" aria-label="Página">
+      <a class="chip" href="<%= base %>?p=<%= period.key %>" <%- !sel ? 'aria-current="true"' : '' %>>Todas as páginas</a>
+      <% live.forEach(function (p) { %><a class="chip" href="<%= base %>?p=<%= period.key %>&pg=<%= p.id %>" <%- sel && sel.id === p.id ? 'aria-current="true"' : '' %>><%= fmt.corta(p.name, 34) %></a><% }) %>
+    </div>
+  </div>
+<% } %>
+
+<!-- relatório da IA -->
+<section class="card ia" aria-labelledby="ia-titulo">
+  <div class="ia__corpo">
+    <div class="ia__texto">
+      <p class="ia__selo"><%- icon('inteligencia') %>Relatório com IA</p>
+      <h2 id="ia-titulo">Melhores palavras-chave e novas campanhas</h2>
+      <p>A IA lê os números deste período (palavras-chave, canais, cidades, horários e aparelhos), o texto das páginas e pesquisa a concorrência na web. Devolve o que manter, o que cortar, palavras novas, negativas, a estrutura das campanhas e os anúncios prontos. Nenhum dado pessoal dos leads é enviado.</p>
+    </div>
+    <% if (running) { %>
+      <div class="ia__andamento" data-acompanhar="/admin/inteligencia/relatorios/<%= running.id %>/status" data-ir="/admin/inteligencia/relatorios/<%= running.id %>">
+        <span class="girando" aria-hidden="true"></span>
+        <div><b>Gerando o relatório</b><p class="mudo">Começou <%= fmt.rel(running.created_at) %>. Leva de 3 a 10 minutos; pode sair desta tela.</p></div>
+        <a class="btn sec peq" href="/admin/inteligencia/relatorios/<%= running.id %>">Acompanhar</a>
+      </div>
+    <% } else if (!cfg.key) { %>
+      <div class="aviso alerta com-icone"><%- icon('alerta') %><span><%= user.role === 'super' ? 'A IA ainda não está ligada: falta a chave da OpenAI no servidor (variável OPENAI_API_KEY).' : 'A IA ainda não está ligada. Peça ao administrador do painel.' %></span></div>
+    <% } else { %>
+      <form class="ia__form" method="post" action="/admin/inteligencia/relatorios" data-enviando="Enviando para a IA...">
+        <input type="hidden" name="p" value="<%= period.key %>">
+        <input type="hidden" name="de" value="<%= period.de %>">
+        <input type="hidden" name="ate" value="<%= period.ate %>">
+        <input type="hidden" name="pg" value="<%= sel ? sel.id : '' %>">
+        <label>O que você quer deste relatório?
+          <textarea name="goal" rows="3" maxlength="1500"><%= goal %></textarea>
+          <span class="ajuda">Ex.: verba mensal, tratamento que quer vender mais, bairros ou cidades de interesse.</span>
+        </label>
+        <div class="acoes">
+          <button class="btn"><%- icon('inteligencia') %>Gerar relatório</button>
+          <span class="mudo pequeno">Período: <b><%= period.label %></b><%= sel ? ' · ' + sel.name : ' · todas as páginas' %> · modelo <%= cfg.model %></span>
+        </div>
+      </form>
+    <% } %>
+  </div>
+  <% if (reports.length) { %>
+    <div class="ia__historico">
+      <h3>Relatórios</h3>
+      <ul class="relatorios">
+        <% reports.forEach(function (r) { const st = STATUS[r.status] || [r.status, '']; %>
+          <li>
+            <a href="/admin/inteligencia/relatorios/<%= r.id %>">
+              <span class="relatorios__quando"><%= fmt.datetime(r.created_at) %></span>
+              <span class="relatorios__periodo"><%= r.period_label %></span>
+              <span class="selo <%= st[1] %>"><%= st[0] %></span>
+            </a>
+            <% if (r.resumo) { %><p><%= fmt.corta(r.resumo, 180) %></p><% } else if (r.error) { %><p class="mudo"><%= r.error %></p><% } %>
+          </li>
+        <% }) %>
+      </ul>
+    </div>
+  <% } %>
+</section>
+
+<% if (!data) { %>
+  <div class="card vazio">Nenhuma página no ar ainda.</div>
+<% } else { %>
+  <dl class="kpis kpis-4">
+    <%- include('partials/kpi', { rotulo: 'Visitas do Google Ads', valor: fmt.int(ads.totais.visitas), d: ads.totais_periodo_anterior ? fmt.delta(ads.totais.visitas, ads.totais_periodo_anterior.visitas) : null, sub: fmt.int(ads.totais.leads) + ' leads · ' + pctN(ads.totais.taxa_lead_pct) }) %>
+    <%- include('partials/kpi', { rotulo: 'Busca orgânica', valor: fmt.int(org.totais.visitas), sub: fmt.int(org.totais.leads) + ' leads · ' + pctN(org.totais.taxa_lead_pct) }) %>
+    <%- include('partials/kpi', { rotulo: 'Palavras-chave com visita', valor: fmt.int(palavras.length + (ads.palavras_chave_omitidas || 0)), sub: fmt.int(palavras.filter(function (p) { return p.leads > 0; }).length) + ' com lead' }) %>
+    <%- include('partials/kpi', { rotulo: 'Leads no total', valor: fmt.int(data.totais.leads), d: data.totais_periodo_anterior ? fmt.delta(data.totais.leads, data.totais_periodo_anterior.leads) : null, sub: pctN(data.totais.taxa_lead_pct) + ' das visitas' }) %>
+  </dl>
+
+  <section class="card" aria-labelledby="kw-titulo">
+    <div class="card__topo">
+      <div>
+        <h2 id="kw-titulo">Palavras-chave do Google Ads</h2>
+        <p>Medidas no site: visitas que chegaram por cada palavra-chave, quantas chamaram no WhatsApp ou no formulário e quantas viraram lead. Custo e cliques no anúncio ficam no Google Ads.</p>
+      </div>
+    </div>
+    <% if (!palavras.length) { %>
+      <p class="vazio"><%= ads.totais.visitas ? 'As visitas do Google Ads chegaram sem palavra-chave. Para ver as palavras, use {keyword} no utm_term do modelo de rastreamento da conta.' : 'Nenhuma visita do Google Ads neste período.' %></p>
+    <% } else { %>
+      <div class="rolagem">
+        <table class="kw">
+          <thead><tr><th>Palavra-chave</th><th class="n">Visitas</th><th class="n">Contatos</th><th class="n">Leads</th><th class="n">Taxa</th><th class="n">Antes</th><th>Cidade principal</th></tr></thead>
+          <tbody>
+            <% ordenadas.forEach(function (p) { const pouca = p.visitas < 30; %>
+              <tr>
+                <td>
+                  <b><%= p.palavra_chave %></b>
+                  <% if (pouca) { %><span class="selo">poucos dados</span><% } %>
+                  <div class="barra" style="width:<%= Math.max(2, Math.round(p.visitas / maxV * 100)) %>%" aria-hidden="true"></div>
+                </td>
+                <td class="n"><%= fmt.int(p.visitas) %></td>
+                <td class="n"><%= fmt.int(p.contatos) %></td>
+                <td class="n"><b><%= fmt.int(p.leads) %></b></td>
+                <td class="n"><%= pctN(p.taxa_lead_pct) %></td>
+                <td class="n mudo" title="Visitas e leads no período anterior de mesmo tamanho"><%= fmt.int(p.periodo_anterior.visitas) %> / <%= fmt.int(p.periodo_anterior.leads) %></td>
+                <td><%= p.cidades_principais[0] || '-' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% if (semTermo) { %><p class="pequeno mudo kw-nota"><%= fmt.int(semTermo.visitas) %> visitas do Google Ads chegaram sem palavra-chave (anúncios de Performance Max, Display ou links sem {keyword}).</p><% } %>
+    <% } %>
+  </section>
+
+  <div class="grade-2">
+    <section class="card" aria-labelledby="canais-titulo">
+      <div class="card__topo"><div><h2 id="canais-titulo">Canais</h2><p>Todas as origens, inclusive a busca orgânica.</p></div></div>
+      <div class="rolagem">
+        <table>
+          <thead><tr><th>Canal</th><th class="n">Visitas</th><th class="n">Leads</th><th class="n">Taxa</th><th class="n">Tempo</th></tr></thead>
+          <tbody>
+            <% data.canais.forEach(function (c) { %>
+              <tr><td><%= c.canal %></td><td class="n"><%= fmt.int(c.visitas) %></td><td class="n"><%= fmt.int(c.leads) %></td><td class="n"><%= pctN(c.taxa_lead_pct) %></td><td class="n"><%= c.tempo_medio_s == null ? '-' : fmt.dur(c.tempo_medio_s * 1000) %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="card" aria-labelledby="cidades-titulo">
+      <div class="card__topo"><div><h2 id="cidades-titulo">Cidades</h2><p>Aproximada pela conexão de internet.</p></div><a class="pequeno" href="/admin/mapa?p=<%= period.key %><%= sel ? '&pg=' + sel.id : '' %>">Abrir o mapa</a></div>
+      <% const cid = data.localizacao.cidades.slice(0, 8); if (!cid.length) { %>
+        <p class="vazio">Ainda sem visitas com cidade. A localização começou em 18/11/2026.</p>
+      <% } else { %>
+        <div class="rolagem">
+          <table>
+            <thead><tr><th>Cidade</th><th class="n">Visitas</th><th class="n">Leads</th><th class="n">Taxa</th></tr></thead>
+            <tbody>
+              <% cid.forEach(function (c) { %><tr><td><%= c.cidade %></td><td class="n"><%= fmt.int(c.visitas) %></td><td class="n"><%= fmt.int(c.leads) %></td><td class="n"><%= pctN(c.taxa_lead_pct) %></td></tr><% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+  </div>
+<% } %>
+<%- include('partials/bottom') %>

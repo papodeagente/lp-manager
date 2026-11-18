@@ -21,6 +21,9 @@ import {
 } from './lib/tracking.js';
 import { makeStats } from './lib/stats.js';
 import { makeGeo } from './lib/geo.js';
+import { makeInsights } from './lib/insights.js';
+import { makeIntel } from './lib/intel.js';
+import { registerCentral } from './lib/central.js';
 import * as fmt from './lib/format.js';
 import { registerAdmin } from './lib/admin.js';
 import { icon } from './lib/icons.js';
@@ -298,9 +301,18 @@ function requireSuperOrToken(req, res, next) {
   return requireSuper(req, res, next);
 }
 
+// Versão dos arquivos do painel (?v=): muda quando qualquer arquivo de public/ muda,
+// e é isso que permite servir tudo com cache de um ano.
 const ASSET_V = (() => {
   const h = crypto.createHash('sha256');
-  for (const f of ['admin.css', 'admin.js']) { try { h.update(fs.readFileSync(path.join(__dirname, 'public', f))); } catch (_) {} }
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const f = path.join(dir, e.name);
+      if (e.isDirectory()) walk(f);
+      else { h.update(e.name); h.update(fs.readFileSync(f)); }
+    }
+  };
+  try { walk(path.join(__dirname, 'public')); } catch (_) {}
   return h.digest('hex').slice(0, 10);
 })();
 
@@ -1244,6 +1256,12 @@ registerAdmin(app, {
   db, pages, stats, stmts, render, takeFlash, audit, requireAuth, requireSuper, sessionStore,
   fireWebhook, webhookFor, testLead, userQ, ah,
 });
+
+const insights = makeInsights(db);
+const siteDirOf = (p) => siteDir(p.slug);
+const intel = makeIntel({ db, insights, pages, siteDirOf, panelUrl: `https://${ADMIN_HOSTS[0]}` });
+registerCentral(app, { pages, insights, intel, geo, render, takeFlash, requireAuth, audit, ah, siteDirOf });
+intel.start();
 
 app.use((err, req, res, next) => {
   const st = err && (err.status || err.statusCode);

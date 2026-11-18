@@ -1,0 +1,243 @@
+<%- include('partials/top') %>
+<link rel="stylesheet" href="/admin/static/intel.css?v=<%= assetV %>">
+<script src="/admin/static/intel.js?v=<%= assetV %>" defer></script>
+<%
+  const o = out || {};
+  const lista = function (x) { return Array.isArray(x) ? x : []; };
+  const NIVEL = { alta: 'ok', 'média': 'alerta', baixa: 'erro' };
+  const IMPACTO = { alto: 'ok', 'médio': 'alerta', baixo: '' };
+  const REC = { aumentar: 'ok', manter: '', reduzir: 'alerta', excluir: 'erro', testar: 'alerta' };
+  const tamanho = function (s, max) { const n = String(s || '').length; return { n: n, passou: n > max }; };
+  const novas = lista(o.palavras_novas);
+  const negativas = lista(o.negativas);
+  const textoNovas = novas.map(function (p) { return matchSyntax(p.palavra, p.correspondencia); }).join('\n');
+  const textoNeg = negativas.map(function (p) { return matchSyntax(p.palavra, p.correspondencia); }).join('\n');
+  const buscas = sources && Array.isArray(sources.buscas) ? sources.buscas : [];
+  const segundos = usage && usage.segundos;
+%>
+<div class="cabeca">
+  <div>
+    <p class="trilha"><a href="/admin/inteligencia">Central de Inteligência</a> / Relatório</p>
+    <h1>Relatório de <%= fmt.datetime(r.created_at) %></h1>
+    <p class="cabeca__meta"><span>Período: <b><%= r.period_label %></b></span><span><%= pageNames.length ? pageNames.join(' · ') : 'Todas as páginas' %></span><span>Modelo <%= r.model %></span><% if (r.author_name || r.author_email) { %><span>Pedido por <%= r.author_name || r.author_email %></span><% } %></p>
+  </div>
+  <% if (r.status === 'pronto') { %>
+    <div class="cabeca__acoes"><button type="button" class="btn sec" data-imprimir><%- icon('baixar') %>Salvar em PDF</button></div>
+  <% } %>
+</div>
+
+<% if (r.status === 'preparando' || r.status === 'gerando') { %>
+  <section class="card ia-espera" data-acompanhar="/admin/inteligencia/relatorios/<%= r.id %>/status" data-ir="/admin/inteligencia/relatorios/<%= r.id %>">
+    <span class="girando grande" aria-hidden="true"></span>
+    <div>
+      <h2>A IA está analisando os dados</h2>
+      <p>Ela lê os números do período, pesquisa a concorrência e monta as campanhas. Costuma levar de 3 a 10 minutos. Esta tela atualiza sozinha; pode sair e voltar depois.</p>
+      <p class="mudo pequeno" aria-live="polite" data-tempo>Começou <%= fmt.rel(r.created_at) %>.</p>
+    </div>
+  </section>
+<% } else if (r.status === 'erro') { %>
+  <div class="aviso alerta com-icone" role="alert"><%- icon('alerta') %><span><%= r.error || 'O relatório não foi concluído.' %> <a href="/admin/inteligencia">Voltar e gerar de novo</a>.</span></div>
+<% } else if (!out) { %>
+  <div class="aviso alerta">O relatório foi salvo num formato que não deu para ler.</div>
+<% } else { %>
+
+  <section class="card resumo-ia" aria-labelledby="resumo-titulo">
+    <div class="resumo-ia__topo">
+      <h2 id="resumo-titulo">Resumo</h2>
+      <% if (o.confianca) { %><span class="selo <%= NIVEL[o.confianca.nivel] || '' %>" title="<%= o.confianca.motivo %>">Confiança <%= o.confianca.nivel %></span><% } %>
+    </div>
+    <p class="resumo-ia__texto"><%= o.resumo %></p>
+    <% if (o.confianca && o.confianca.motivo) { %><p class="mudo pequeno"><%= o.confianca.motivo %></p><% } %>
+  </section>
+
+  <% if (o.diagnostico) { %>
+    <div class="grade-3 diagnostico">
+      <% [['O que está funcionando', 'funciona', 'ok'], ['O que não está funcionando', 'nao_funciona', 'erro'], ['Oportunidades', 'oportunidades', 'alerta']].forEach(function (d) { %>
+        <section class="card diag diag--<%= d[2] %>">
+          <h2><%= d[0] %></h2>
+          <ul class="pontos"><% lista(o.diagnostico[d[1]]).forEach(function (t) { %><li><%= t %></li><% }) %></ul>
+        </section>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <div class="grade-2">
+    <section class="card" aria-labelledby="investir-titulo">
+      <div class="card__topo"><div><h2 id="investir-titulo">Palavras para investir</h2><p>As que já trazem pacientes.</p></div></div>
+      <% if (!lista(o.palavras_investir).length) { %><p class="vazio">Nenhuma com dados suficientes.</p><% } %>
+      <ul class="kw-lista">
+        <% lista(o.palavras_investir).forEach(function (p) { %>
+          <li><b><%= p.palavra %></b><span class="evid"><%= p.evidencia %></span><span class="acao"><%= p.acao %></span></li>
+        <% }) %>
+      </ul>
+    </section>
+    <section class="card" aria-labelledby="revisar-titulo">
+      <div class="card__topo"><div><h2 id="revisar-titulo">Palavras para revisar ou cortar</h2><p>Trazem visita, mas pouco paciente.</p></div></div>
+      <% if (!lista(o.palavras_revisar).length) { %><p class="vazio">Nada a cortar com os dados atuais.</p><% } %>
+      <ul class="kw-lista">
+        <% lista(o.palavras_revisar).forEach(function (p) { %>
+          <li><b><%= p.palavra %></b><span class="evid"><%= p.evidencia %></span><span class="acao"><%= p.acao %></span></li>
+        <% }) %>
+      </ul>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="novas-titulo">
+    <div class="card__topo">
+      <div><h2 id="novas-titulo">Palavras novas para testar</h2><p>No formato do Google Ads: [exata], "frase" e ampla.</p></div>
+      <% if (novas.length) { %><button type="button" class="btn sec peq" data-copiar="#txt-novas"><%- icon('copiar') %>Copiar todas</button><% } %>
+    </div>
+    <textarea id="txt-novas" class="sr" tabindex="-1" aria-hidden="true" readonly><%= textoNovas %></textarea>
+    <div class="rolagem">
+      <table>
+        <thead><tr><th>Palavra-chave</th><th>Grupo</th><th>Intenção</th><th>Prioridade</th><th>Por quê</th></tr></thead>
+        <tbody>
+          <% novas.forEach(function (p) { %>
+            <tr>
+              <td class="mono-kw"><%= matchSyntax(p.palavra, p.correspondencia) %></td>
+              <td><%= p.grupo %></td>
+              <td><%= p.intencao %></td>
+              <td><span class="selo <%= IMPACTO[p.prioridade === 'alta' ? 'alto' : p.prioridade === 'média' ? 'médio' : 'baixo'] %>"><%= p.prioridade %></span></td>
+              <td class="pequeno"><%= p.motivo %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="neg-titulo">
+    <div class="card__topo">
+      <div><h2 id="neg-titulo">Palavras negativas</h2><p>Para o anúncio não aparecer em buscas de quem não vai virar paciente.</p></div>
+      <% if (negativas.length) { %><button type="button" class="btn sec peq" data-copiar="#txt-neg"><%- icon('copiar') %>Copiar todas</button><% } %>
+    </div>
+    <textarea id="txt-neg" class="sr" tabindex="-1" aria-hidden="true" readonly><%= textoNeg %></textarea>
+    <ul class="chips-neg">
+      <% negativas.forEach(function (p) { %><li title="<%= p.motivo %>"><span class="mono-kw"><%= matchSyntax(p.palavra, p.correspondencia) %></span><small><%= p.motivo %></small></li><% }) %>
+    </ul>
+  </section>
+
+  <section aria-labelledby="camp-titulo" class="campanhas">
+    <h2 id="camp-titulo" class="secao-titulo">Campanhas propostas</h2>
+    <% lista(o.campanhas).forEach(function (c, ci) { %>
+      <article class="card campanha">
+        <div class="campanha__topo">
+          <div>
+            <h3><%= c.nome %></h3>
+            <p><%= c.objetivo %></p>
+          </div>
+          <div class="campanha__verba" title="Parte da verba total"><b><%= c.orcamento_pct %>%</b><small>da verba</small></div>
+        </div>
+        <dl class="campanha__ficha">
+          <div><dt>Tipo</dt><dd><%= c.tipo %></dd></div>
+          <div><dt>Página de destino</dt><dd><%= c.pagina %></dd></div>
+          <div><dt>Lances</dt><dd><%= c.estrategia_de_lance %></dd></div>
+          <div><dt>Locais</dt><dd><%= c.locais %></dd></div>
+          <div><dt>Dias e horários</dt><dd><%= c.horarios %></dd></div>
+        </dl>
+        <% lista(c.grupos).forEach(function (g, gi) { const tit = lista(g.titulos), desc = lista(g.descricoes); const idTxt = 'txt-g-' + ci + '-' + gi; %>
+          <div class="grupo">
+            <div class="grupo__topo">
+              <h4><%= g.nome %></h4>
+              <button type="button" class="btn sec peq" data-copiar="#<%= idTxt %>"><%- icon('copiar') %>Copiar palavras</button>
+            </div>
+            <textarea id="<%= idTxt %>" class="sr" tabindex="-1" aria-hidden="true" readonly><%= lista(g.palavras).join('\n') %></textarea>
+            <ul class="kw-chips"><% lista(g.palavras).forEach(function (k) { %><li class="mono-kw"><%= k %></li><% }) %></ul>
+            <div class="anuncio-grade">
+              <div class="anuncio" aria-label="Prévia do anúncio">
+                <p class="anuncio__selo">Patrocinado</p>
+                <p class="anuncio__titulo"><%= tit.slice(0, 3).join(' | ') %></p>
+                <p class="anuncio__desc"><%= desc.slice(0, 2).join(' ') %></p>
+              </div>
+              <div class="anuncio-textos">
+                <p class="rotulo-peq">Títulos (até 30 caracteres)</p>
+                <ol><% tit.forEach(function (t) { const s = tamanho(t, 30); %><li><span><%= t %></span><small class="<%= s.passou ? 'passou' : '' %>"><%= s.n %></small></li><% }) %></ol>
+                <p class="rotulo-peq">Descrições (até 90 caracteres)</p>
+                <ol><% desc.forEach(function (t) { const s = tamanho(t, 90); %><li><span><%= t %></span><small class="<%= s.passou ? 'passou' : '' %>"><%= s.n %></small></li><% }) %></ol>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      </article>
+    <% }) %>
+  </section>
+
+  <div class="grade-2">
+    <section class="card" aria-labelledby="locais-titulo">
+      <div class="card__topo"><div><h2 id="locais-titulo">Locais</h2><p>Onde investir mais ou menos.</p></div></div>
+      <ul class="recs">
+        <% lista(o.locais).forEach(function (l) { %><li><div><b><%= l.local %></b><span class="selo <%= REC[l.recomendacao] || '' %>"><%= l.recomendacao %></span></div><p><%= l.motivo %></p></li><% }) %>
+      </ul>
+    </section>
+    <section class="card" aria-labelledby="hor-titulo">
+      <div class="card__topo"><div><h2 id="hor-titulo">Dias, horários e aparelhos</h2></div></div>
+      <ul class="recs">
+        <% lista(o.horarios_e_aparelhos).forEach(function (h) { %><li><div><b><%= h.item %></b></div><p><%= h.recomendacao %></p><p class="mudo pequeno"><%= h.motivo %></p></li><% }) %>
+      </ul>
+    </section>
+  </div>
+
+  <div class="grade-2">
+    <section class="card" aria-labelledby="seo-titulo">
+      <div class="card__topo"><div><h2 id="seo-titulo">Busca orgânica (SEO)</h2><p>Para aparecer no Google sem pagar.</p></div></div>
+      <ul class="recs">
+        <% lista(o.organico).forEach(function (s) { %><li><b><%= s.acao %></b><p class="mudo pequeno"><%= s.motivo %></p></li><% }) %>
+      </ul>
+    </section>
+    <section class="card" aria-labelledby="pag-titulo">
+      <div class="card__topo"><div><h2 id="pag-titulo">Ajustes nas páginas</h2><p>Para converter mais as visitas que já chegam.</p></div></div>
+      <ul class="recs">
+        <% lista(o.paginas).forEach(function (s) { %><li><div><b><%= s.pagina %></b></div><p><%= s.acao %></p><p class="mudo pequeno"><%= s.motivo %></p></li><% }) %>
+      </ul>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="passos-titulo">
+    <div class="card__topo"><div><h2 id="passos-titulo">Próximos passos</h2><p>Em ordem de prioridade.</p></div></div>
+    <div class="rolagem">
+      <table>
+        <thead><tr><th>Ação</th><th>Impacto</th><th>Esforço</th><th>Quando</th></tr></thead>
+        <tbody>
+          <% lista(o.proximos_passos).forEach(function (p) { %>
+            <tr><td><%= p.acao %></td><td><span class="selo <%= IMPACTO[p.impacto] || '' %>"><%= p.impacto %></span></td><td><%= p.esforco %></td><td><%= p.quando %></td></tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="grade-2">
+    <section class="card" aria-labelledby="cuid-titulo">
+      <div class="card__topo"><div><h2 id="cuid-titulo">Cuidados com as regras</h2><p>Políticas do Google e do conselho profissional.</p></div></div>
+      <ul class="pontos"><% lista(o.cuidados).forEach(function (t) { %><li><%= t %></li><% }) %></ul>
+    </section>
+    <section class="card" aria-labelledby="lim-titulo">
+      <div class="card__topo"><div><h2 id="lim-titulo">Limites dos dados</h2></div></div>
+      <ul class="pontos"><% lista(o.limitacoes_dos_dados).forEach(function (t) { %><li><%= t %></li><% }) %></ul>
+    </section>
+  </div>
+
+  <% if (lista(o.pesquisa_de_mercado).length || buscas.length) { %>
+    <section class="card" aria-labelledby="pesq-titulo">
+      <div class="card__topo"><div><h2 id="pesq-titulo">Pesquisa de mercado</h2><p>O que a IA encontrou na web, com a fonte.</p></div></div>
+      <ul class="fontes">
+        <% lista(o.pesquisa_de_mercado).forEach(function (f) { const u = safeUrl(f.fonte_url); %>
+          <li><p><%= f.achado %></p><% if (u) { %><a href="<%= u %>" target="_blank" rel="noopener noreferrer nofollow"><%= hostOf(u) %></a><% } %></li>
+        <% }) %>
+      </ul>
+      <% if (buscas.length) { %>
+        <details class="mais"><summary>Buscas feitas pela IA (<%= buscas.length %>)</summary><ul class="pontos pequeno"><% buscas.forEach(function (b) { %><li><%= b %></li><% }) %></ul></details>
+      <% } %>
+    </section>
+  <% } %>
+
+  <section class="card rodape-ia">
+    <details class="mais">
+      <summary>Dados enviados à IA</summary>
+      <p class="mudo pequeno">Só contagens, palavras-chave, cidades e o texto das páginas. Nenhum nome, telefone ou mensagem de lead.</p>
+      <pre class="json"><%= JSON.stringify(input, null, 2) %></pre>
+    </details>
+    <p class="mudo pequeno"><% if (usage) { %><%= fmt.int(usage.input_tokens) %> tokens de entrada, <%= fmt.int(usage.output_tokens) %> de saída<%= usage.output_tokens_details && usage.output_tokens_details.reasoning_tokens ? ' (' + fmt.int(usage.output_tokens_details.reasoning_tokens) + ' de raciocínio)' : '' %><%= segundos ? ' · ' + fmt.dur(segundos * 1000) : '' %> · <% } %>Objetivo informado: <%= r.goal %></p>
+  </section>
+<% } %>
+<%- include('partials/bottom') %>

@@ -1,0 +1,129 @@
+<%- include('partials/top') %>
+<link rel="stylesheet" href="/admin/static/vendor/leaflet/leaflet.css?v=<%= assetV %>">
+<link rel="stylesheet" href="/admin/static/intel.css?v=<%= assetV %>">
+<script src="/admin/static/vendor/leaflet/leaflet.js?v=<%= assetV %>" defer></script>
+<script src="/admin/static/mapa.js?v=<%= assetV %>" defer></script>
+<%
+  const base = '/admin/mapa';
+  const campo = { visitas: 'visits', contatos: 'contacts', leads: 'leads' }[metrica];
+  const pts = data ? data.points.filter(function (p) { return p[campo] > 0; }) : [];
+  const maxCidade = pts.reduce(function (m, p) { return Math.max(m, p[campo]); }, 0);
+  const regs = data ? data.regions.filter(function (r) { return r[campo] > 0; }) : [];
+  const maxReg = regs.reduce(function (m, r) { return Math.max(m, r[campo]); }, 0);
+  const link = function (o) { return base + '?' + qs(Object.assign({ p: period.key, de: period.key === 'custom' ? period.de : '', ate: period.key === 'custom' ? period.ate : '', pg: sel ? sel.id : '', canal: canal, m: metrica }, o)); };
+  const valor = function (x) { return fmt.int(x[campo]); };
+%>
+<div class="cabeca">
+  <div>
+    <h1>Mapa de origem</h1>
+    <p>De onde vêm as visitas, os contatos e os leads, por cidade e por canal.</p>
+  </div>
+</div>
+
+<%- include('partials/period', { base: base, extra: extra, hidden: { pg: sel ? sel.id : '', canal: canal, m: metrica } }) %>
+
+<div class="filtros filtros-mapa">
+  <% if (live.length > 1) { %>
+    <div class="segmento" role="group" aria-label="Página">
+      <a class="chip" href="<%= link({ pg: '' }) %>" <%- !sel ? 'aria-current="true"' : '' %>>Todas as páginas</a>
+      <% live.forEach(function (p) { %><a class="chip" href="<%= link({ pg: p.id }) %>" <%- sel && sel.id === p.id ? 'aria-current="true"' : '' %>><%= fmt.corta(p.name, 34) %></a><% }) %>
+    </div>
+  <% } %>
+  <div class="segmento" role="group" aria-label="O que o tamanho do círculo mostra">
+    <% Object.keys(METRICS).forEach(function (k) { %><a class="chip" href="<%= link({ m: k }) %>" <%- metrica === k ? 'aria-current="true"' : '' %>><%= METRICS[k] %></a><% }) %>
+  </div>
+</div>
+<div class="filtros canais" role="group" aria-label="Canal">
+  <a class="chip" href="<%= link({ canal: '' }) %>" <%- !canal ? 'aria-current="true"' : '' %>>Todos os canais</a>
+  <% canais.forEach(function (c) { %><a class="chip" href="<%= link({ canal: c[0] }) %>" <%- canal === c[0] ? 'aria-current="true"' : '' %>><%= CHANNELS[c[0]] || c[0] %> <span class="mudo num"><%= fmt.int(c[1]) %></span></a><% }) %>
+</div>
+
+<% if (!geoStatus.ready) { %>
+  <div class="aviso alerta com-icone" role="status"><%- icon('alerta') %><span>A base de localização ainda está sendo baixada pelo servidor. As visitas novas ganham cidade assim que ela ficar pronta (alguns minutos depois do início).</span></div>
+<% } %>
+
+<% if (!data) { %>
+  <div class="card vazio">Nenhuma página no ar ainda.</div>
+<% } else { %>
+  <dl class="kpis kpis-4">
+    <%- include('partials/kpi', { rotulo: 'Visitas' + (canal ? ' · ' + (CHANNELS[canal] || canal) : ''), valor: fmt.int(data.totals.visits), sub: fmt.int(data.totals.visits - data.unknown.visits) + ' com cidade' }) %>
+    <%- include('partials/kpi', { rotulo: 'Cidades', valor: fmt.int(data.points.length), sub: regs.length ? fmt.int(regs.filter(function (r) { return r.country === 'BR'; }).length) + ' estados' : '' }) %>
+    <%- include('partials/kpi', { rotulo: 'Contatos', valor: fmt.int(data.totals.contacts), sub: data.totals.visits ? fmt.pct(data.totals.contacts / data.totals.visits) + ' das visitas' : '' }) %>
+    <%- include('partials/kpi', { rotulo: 'Leads', valor: fmt.int(data.totals.leads), sub: data.totals.visits ? fmt.pct(data.totals.leads / data.totals.visits) + ' das visitas' : '' }) %>
+  </dl>
+
+  <div class="mapa-grade">
+    <section class="card mapa-card" aria-labelledby="mapa-titulo">
+      <div class="card__topo">
+        <div>
+          <h2 id="mapa-titulo"><%= METRICS[metrica] %> por cidade</h2>
+          <p>O tamanho do círculo é proporcional ao número de <%= METRICS[metrica].toLowerCase() %>. Toque ou passe o mouse para ver os detalhes.</p>
+        </div>
+        <div class="mapa-vistas" role="group" aria-label="Aproximar">
+          <button type="button" class="btn sec peq" data-vista="dados">Ajustar</button>
+          <button type="button" class="btn sec peq" data-vista="df">DF e entorno</button>
+          <button type="button" class="btn sec peq" data-vista="brasil">Brasil</button>
+        </div>
+      </div>
+      <div id="mapa" class="mapa" role="region" aria-label="Mapa de <%= METRICS[metrica].toLowerCase() %> por cidade; a lista ao lado traz os mesmos números"
+        data-geo="/admin/static/geo/" data-v="<%= assetV %>"></div>
+      <script type="application/json" id="mapa-dados"><%- mapJson %></script>
+      <p class="mapa-nota">Cidade aproximada pela conexão de internet: quem mora numa cidade vizinha pode aparecer na cidade da operadora. Localização por <a href="https://db-ip.com" target="_blank" rel="noopener noreferrer">DB-IP</a>; contornos: IBGE e Natural Earth.<% if (data.unknown.visits) { %> <%= fmt.int(data.unknown.visits) %> visita<%= data.unknown.visits === 1 ? '' : 's' %> sem cidade (anteriores à localização, ligada em 18/11/2026, ou de redes não identificadas).<% } %></p>
+    </section>
+
+    <section class="card" aria-labelledby="rank-titulo">
+      <div class="card__topo"><div><h2 id="rank-titulo">Cidades</h2><p>Por <%= METRICS[metrica].toLowerCase() %></p></div></div>
+      <% if (!pts.length) { %>
+        <p class="vazio">Sem <%= METRICS[metrica].toLowerCase() %> com cidade neste período.</p>
+      <% } else { %>
+        <ol class="barras ranking">
+          <% pts.slice(0, 8).forEach(function (p) { %>
+            <li>
+              <span class="nome" title="<%= p.label %>"><%= p.label %></span>
+              <span class="val"><%= valor(p) %><% if (metrica === 'visitas' && p.leads) { %><small><%= fmt.int(p.leads) %> lead<%= p.leads === 1 ? '' : 's' %></small><% } %></span>
+              <span class="trilho" aria-hidden="true"><i style="width:<%= Math.max(2, Math.round(p[campo] / maxCidade * 100)) %>%"></i></span>
+            </li>
+          <% }) %>
+        </ol>
+      <% } %>
+      <% if (regs.length) { %>
+        <h3 class="sub-titulo">Estados e países</h3>
+        <ol class="barras ranking">
+          <% regs.slice(0, 6).forEach(function (r) { %>
+            <li>
+              <span class="nome"><%= r.label %></span>
+              <span class="val"><%= valor(r) %></span>
+              <span class="trilho" aria-hidden="true"><i style="width:<%= Math.max(2, Math.round(r[campo] / maxReg * 100)) %>%"></i></span>
+            </li>
+          <% }) %>
+        </ol>
+      <% } %>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="tab-titulo">
+    <div class="card__topo"><div><h2 id="tab-titulo">Todas as cidades</h2><p>Taxa = leads ÷ visitas. Principal origem = canal que mais trouxe visitas daquela cidade.</p></div></div>
+    <% if (!data.points.length) { %>
+      <p class="vazio">Nenhuma visita com cidade neste período.</p>
+    <% } else { %>
+      <div class="rolagem">
+        <table>
+          <thead><tr><th>Cidade</th><th class="n">Visitas</th><th class="n">Contatos</th><th class="n">Leads</th><th class="n">Taxa</th><th>Principal origem</th></tr></thead>
+          <tbody>
+            <% data.points.forEach(function (p) { %>
+              <tr>
+                <td><%= p.label %></td>
+                <td class="n"><%= fmt.int(p.visits) %></td>
+                <td class="n"><%= fmt.int(p.contacts) %></td>
+                <td class="n"><%= fmt.int(p.leads) %></td>
+                <td class="n"><%= p.rate == null ? '-' : fmt.pct(p.rate / 100) %></td>
+                <td><%= p.topChannel ? (CHANNELS[p.topChannel] || p.topChannel) : '-' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+<% } %>
+<%- include('partials/bottom') %>

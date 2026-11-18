@@ -1,0 +1,155 @@
+/* Telas do Mapa e da Central de Inteligência. Usa as variáveis do admin.css
+   (superfícies, linhas, tintas, raio e acento), então segue o tema do painel. */
+:root{
+  --acento-ia:var(--acento,var(--s1));
+  --mapa-ponto:var(--acento-ia);
+  --mapa-fundo:var(--fundo);
+  --mapa-terra:var(--sup-3);
+  --mapa-borda:var(--linha-2);
+  --mapa-borda-fina:var(--linha);
+}
+
+.kpis.kpis-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:1100px){.kpis.kpis-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.filtros.canais{gap:8px}
+.filtros.canais .chip .mudo{font-size:12px;margin-left:2px}
+.sub-titulo{font-size:13px;font-weight:600;color:var(--tinta-2);margin:22px 0 12px;letter-spacing:.01em}
+
+/* ── mapa ── */
+.mapa-grade{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:1100px){.mapa-grade{grid-template-columns:minmax(0,1fr)}}
+.mapa-card{display:grid;gap:12px}
+.mapa-card .card__topo{margin-bottom:0}
+.mapa-vistas{display:flex;gap:6px;flex-wrap:wrap}
+.mapa{height:540px;border-radius:calc(var(--raio) - 2px);overflow:hidden;background:var(--mapa-fundo);border:1px solid var(--linha)}
+@media (max-width:640px){.mapa{height:420px}}
+.mapa-nota{font-size:12.5px;color:var(--tinta-3);line-height:1.5}
+.mapa-nota a{color:var(--tinta-2)}
+.leaflet-container{background:var(--mapa-fundo);font:inherit;outline-offset:2px}
+.leaflet-container:focus-visible{outline:2px solid var(--foco)}
+.leaflet-bar{border:1px solid var(--linha-2)!important;box-shadow:none!important;border-radius:10px!important;overflow:hidden}
+.leaflet-bar a,.leaflet-bar a:hover{background:var(--sup);color:var(--tinta);border-bottom:1px solid var(--linha)!important;width:32px;height:32px;line-height:30px}
+.leaflet-bar a:hover{background:var(--sup-3)}
+.leaflet-bar a.leaflet-disabled{background:var(--sup-2);color:var(--tinta-3)}
+.leaflet-tooltip.mapa-dica{background:var(--sup);color:var(--tinta);border:1px solid var(--linha-2);border-radius:12px;box-shadow:var(--sombra-3);padding:10px 12px;font-size:13px;line-height:1.45;white-space:normal;min-width:180px;max-width:280px}
+.leaflet-tooltip.mapa-dica::before{border-top-color:var(--linha-2)}
+.mapa-dica strong{display:block;font-size:14px;font-weight:650;margin-bottom:2px}
+.mapa-dica .dica-linha{display:block;color:var(--tinta)}
+.mapa-dica .dica-canais{display:block;margin-top:6px;padding-top:6px;border-top:1px solid var(--linha);color:var(--tinta-2);font-size:12.5px}
+.mapa-dica .dica-canais b{color:var(--tinta);font-weight:600}
+.ranking{gap:12px}
+.ranking .nome{font-size:13.5px}
+
+/* ── Central: cartão da IA ── */
+.card.ia{padding:0;overflow:hidden}
+.ia__corpo{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:24px;padding:24px;align-items:start}
+@media (max-width:960px){.ia__corpo{grid-template-columns:minmax(0,1fr)}}
+.ia__selo{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--acento-ia);margin-bottom:10px}
+.ia__selo .ic{width:16px;height:16px}
+.ia__texto h2{font-size:20px;font-weight:650;letter-spacing:-.01em;margin-bottom:8px}
+.ia__texto p:last-child{color:var(--tinta-2);font-size:14px;max-width:62ch}
+.ia__form{display:grid;gap:14px}
+.ia__form textarea{resize:vertical;min-height:84px;line-height:1.5}
+.ia__andamento{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:16px;border:1px solid var(--linha);border-radius:12px;background:var(--sup-2)}
+.ia__andamento p{font-size:13px}
+.ia__historico{border-top:1px solid var(--linha);padding:18px 24px 22px;background:var(--sup-2)}
+.ia__historico h3{font-size:13px;font-weight:600;color:var(--tinta-2);margin-bottom:10px}
+.relatorios{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.relatorios li{padding:10px 12px;border-radius:10px}
+.relatorios li:hover{background:var(--sup-3)}
+.relatorios a{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;text-decoration:none}
+.relatorios__quando{font-weight:600}
+.relatorios__periodo{color:var(--tinta-3);font-size:13px}
+.relatorios a .selo{margin-left:auto}
+.relatorios p{margin-top:4px;font-size:13px;color:var(--tinta-2);max-width:100ch}
+.girando{width:22px;height:22px;border-radius:50%;border:2.5px solid var(--linha-2);border-top-color:var(--acento-ia);display:inline-block}
+.girando.grande{width:34px;height:34px;border-width:3px}
+@media (prefers-reduced-motion:no-preference){.girando{animation:girar 1s linear infinite}}
+@keyframes girar{to{transform:rotate(360deg)}}
+.kw td b{font-weight:600}
+.kw td .selo{margin-left:8px;font-size:11px}
+.kw td .barra{max-width:260px}
+.kw-nota{margin-top:12px}
+
+/* ── relatório ── */
+.ia-espera{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:start;padding:28px}
+.ia-espera h2{font-size:18px;font-weight:650;margin-bottom:6px}
+.ia-espera p{color:var(--tinta-2);max-width:70ch}
+.resumo-ia{padding:24px 26px}
+.resumo-ia__topo{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.resumo-ia__topo h2{font-size:15px;color:var(--tinta-2);font-weight:600}
+.resumo-ia__texto{font-size:18px;line-height:1.6;color:var(--tinta);max-width:90ch;margin-bottom:8px;letter-spacing:-.005em}
+.diag h2{font-size:15px;font-weight:650;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.diag h2::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--tinta-3)}
+.diag--ok h2::before{background:var(--ok)}
+.diag--erro h2::before{background:var(--erro)}
+.diag--alerta h2::before{background:var(--alerta)}
+.pontos{margin:0;padding-left:18px;display:grid;gap:8px;color:var(--tinta-2);font-size:14px;line-height:1.5}
+.pontos li::marker{color:var(--tinta-3)}
+.kw-lista{list-style:none;margin:0;padding:0;display:grid}
+.kw-lista li{display:grid;gap:3px;padding:12px 0;border-bottom:1px solid var(--grade)}
+.kw-lista li:first-child{padding-top:0}
+.kw-lista li:last-child{border-bottom:0;padding-bottom:0}
+.kw-lista b{font-weight:650}
+.kw-lista .evid{font-size:13px;color:var(--tinta-3)}
+.kw-lista .acao{font-size:14px;color:var(--tinta-2)}
+.mono-kw{font-family:var(--mono);font-size:13px;color:var(--tinta)}
+td.mono-kw{white-space:nowrap}
+.chips-neg{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.chips-neg li{display:grid;gap:2px;padding:8px 12px;border:1px solid var(--linha);border-radius:10px;background:var(--sup-2);max-width:340px}
+.chips-neg small{font-size:12px;color:var(--tinta-3)}
+.secao-titulo{font-size:18px;font-weight:650;letter-spacing:-.01em;margin:8px 0 2px}
+.campanhas{display:grid;gap:16px}
+.campanha{display:grid;gap:18px}
+.campanha__topo{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.campanha__topo h3{font-size:17px;font-weight:650;margin-bottom:4px}
+.campanha__topo p{color:var(--tinta-2);font-size:14px;max-width:75ch}
+.campanha__verba{display:grid;justify-items:end;flex:none}
+.campanha__verba b{font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--acento-ia);line-height:1}
+.campanha__verba small{font-size:12px;color:var(--tinta-3)}
+.campanha__ficha{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:1px;margin:0;background:var(--linha);border:1px solid var(--linha);border-radius:12px;overflow:hidden}
+.campanha__ficha div{background:var(--sup);padding:10px 14px}
+.campanha__ficha dt{font-size:12px;color:var(--tinta-3)}
+.campanha__ficha dd{margin:2px 0 0;font-size:13.5px;color:var(--tinta)}
+.grupo{border-top:1px solid var(--linha);padding-top:16px;display:grid;gap:12px}
+.grupo__topo{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.grupo h4{font-size:14.5px;font-weight:650}
+.kw-chips{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.kw-chips li{padding:3px 10px;border-radius:999px;background:var(--sup-3);border:1px solid var(--linha)}
+.anuncio-grade{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.anuncio-grade{grid-template-columns:minmax(0,1fr)}}
+.anuncio{border:1px solid var(--linha);border-radius:12px;padding:14px 16px;background:var(--sup-2)}
+.anuncio__selo{font-size:12px;font-weight:700;color:var(--tinta-2);margin-bottom:4px}
+.anuncio__titulo{font-size:17px;line-height:1.35;color:#8AB4F8;margin-bottom:6px}
+.anuncio__desc{font-size:13.5px;line-height:1.5;color:var(--tinta-2)}
+.anuncio-textos .rotulo-peq{font-size:12px;color:var(--tinta-3);font-weight:600;margin:0 0 6px}
+.anuncio-textos ol{margin:0 0 12px;padding:0;list-style:none;display:grid;gap:4px}
+.anuncio-textos li{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:4px 0;border-bottom:1px dashed var(--grade)}
+.anuncio-textos li small{color:var(--tinta-3);font-variant-numeric:tabular-nums;flex:none}
+.anuncio-textos li small.passou{color:var(--erro);font-weight:700}
+.recs{list-style:none;margin:0;padding:0;display:grid}
+.recs li{padding:12px 0;border-bottom:1px solid var(--grade);display:grid;gap:4px}
+.recs li:first-child{padding-top:0}
+.recs li:last-child{border-bottom:0;padding-bottom:0}
+.recs li>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.recs b{font-weight:650}
+.recs p{font-size:14px;color:var(--tinta-2)}
+.fontes{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:10px}
+.fontes li{display:grid;gap:2px;padding:10px 12px;border:1px solid var(--linha);border-radius:10px;background:var(--sup-2)}
+.fontes p{font-size:14px}
+.fontes a{font-size:12.5px;color:var(--tinta-3)}
+.rodape-ia{display:grid;gap:10px}
+pre.json{max-height:420px;overflow:auto;background:var(--sup-2);border:1px solid var(--linha);border-radius:10px;padding:12px;font-size:12px;line-height:1.45;color:var(--tinta-2);white-space:pre-wrap;word-break:break-word}
+.btn.copiado{border-color:var(--ok);color:var(--ok)}
+
+@media print{
+  .lateral,.barra-cel,.cabeca__acoes,[data-copiar],.rodape-ia details,.trilha{display:none!important}
+  .app{display:block}
+  body{background:#fff;color:#111}
+  .conteudo{max-width:none;padding:0}
+  .card{break-inside:avoid;box-shadow:none}
+}
+@media (max-width:760px){
+  .mapa-card .card__topo{grid-template-columns:minmax(0,1fr);gap:10px}
+  .mapa-card .card__topo>.mapa-vistas{grid-column:1;grid-row:auto;align-self:start}
+}
