@@ -114,11 +114,16 @@ inventar esses números e a tratar amostra pequena como sinal fraco.
 
 ## Visual
 
-Menu lateral no computador e gaveta no celular (atributo `popover`, com reserva em `admin.js` para
-navegador antigo), modo claro e escuro pelo sistema. Interface neutra; cor só onde é dado: cada página tem a
-sua (bolinha no menu, linhas e barras dos gráficos), conferida com validador de paleta para daltonismo.
+Tema escuro fixo (verde quase preto, acento limão), no estilo de painel financeiro: menu lateral num cartão
+no computador e gaveta no celular (atributo `popover`, com reserva em `admin.js` para navegador antigo),
+cartões grandes sem borda forte, números grandes, filtros em pílulas, cabeçalho de tabela e botão principal
+no acento. Cor só onde é dado: cada página tem a sua (`--s1` limão, `--s2` azul, `--s3` orquídea, na bolinha
+do menu e nas linhas e barras dos gráficos), conferida com validador de paleta (daltonismo, contraste e faixa
+de luminosidade) contra a superfície escura; status (ok verde-água, alerta âmbar, erro vermelho) sempre com
+texto e longe do limão. Todo texto passa de 4,5:1 de contraste. Impressão sai em papel claro, sem o menu.
 Fonte Figtree (`public/fonts`, licença SIL OFL) e ícones Lucide (licença ISC) desenhados inline em
-`lib/icons.js`.
+`lib/icons.js`. As telas do Mapa e da Inteligência têm o CSS próprio em `public/intel.css`, que usa as
+mesmas variáveis.
 
 ## Publicar um site por linha de comando
 
