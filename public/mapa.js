@@ -14,14 +14,16 @@
     var ponto = cor('--mapa-ponto', '#B8F25B');
     var terra = cor('--mapa-terra', '#1f2a28');
     var borda = cor('--mapa-borda', '#3a4744');
-    var bordaFina = cor('--mapa-borda-fina', '#2c3735');
+    var bordaFina = cor('--mapa-borda-fina', '#303f3a');
+    var bordaEntorno = cor('--mapa-borda-entorno', '#3d4b47');
     var nf = new Intl.NumberFormat('pt-BR');
     var nf1 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
     var map = L.map(el, {
-      zoomControl: true, attributionControl: false, minZoom: 2, maxZoom: 12,
+      zoomControl: false, attributionControl: false, minZoom: 2, maxZoom: 12,
       zoomSnap: 0.5, worldCopyJump: true, scrollWheelZoom: false,
     });
+    L.control.zoom({ zoomInTitle: 'Aproximar', zoomOutTitle: 'Afastar' }).addTo(map);
     // rolar a página não dá zoom sem querer; com o mapa clicado, a roda passa a aproximar
     map.on('click focus', function () { map.scrollWheelZoom.enable(); });
     map.on('mouseout blur', function () { map.scrollWheelZoom.disable(); });
@@ -47,7 +49,7 @@
     carrega('mundo.json', 'mundo', function () { return { color: bordaFina, weight: 0.6, fillColor: terra, fillOpacity: 0.55 }; });
     carrega('uf.json', 'estados', function () { return { color: borda, weight: 0.9, fillColor: terra, fillOpacity: 0.9 }; });
     var entorno = null;
-    carrega('entorno.json', 'entorno', function () { return { color: bordaFina, weight: 0.5, fillOpacity: 0, dashArray: '2 3' }; }, function (c) {
+    carrega('entorno.json', 'entorno', function () { return { color: bordaEntorno, weight: 0.7, fillOpacity: 0, dashArray: '2 3' }; }, function (c) {
       entorno = c;
       ajustaEntorno();
     });

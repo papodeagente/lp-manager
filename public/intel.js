@@ -2,31 +2,48 @@
 (function () {
   'use strict';
   function iniciar() {
-    // copiar palavras (formato aceito pelo Google Ads e pelo Google Ads Editor: uma por linha)
-    document.querySelectorAll('[data-copiar]').forEach(function (b) {
+    // copiar palavras (formato aceito pelo Google Ads e pelo Google Ads Editor: uma por linha).
+    // Atributo próprio (data-copiar-lista): o data-copiar do admin.js espera um id sem "#".
+    document.querySelectorAll('[data-copiar-lista]').forEach(function (b) {
       b.addEventListener('click', function () {
-        var alvo = document.querySelector(b.getAttribute('data-copiar'));
+        var alvo = document.querySelector(b.getAttribute('data-copiar-lista'));
         if (!alvo) return;
         var texto = alvo.value || alvo.textContent || '';
         var ok = function () {
-          var antes = b.lastChild && b.lastChild.nodeType === 3 ? b.lastChild.nodeValue : null;
-          if (antes != null) b.lastChild.nodeValue = 'Copiado';
+          var t = b.lastChild && b.lastChild.nodeType === 3 ? b.lastChild : null;
+          if (!t) return;
+          if (b.dataset.rotulo == null) b.dataset.rotulo = t.nodeValue;
+          t.nodeValue = 'Copiado';
           b.classList.add('copiado');
-          setTimeout(function () { if (antes != null) b.lastChild.nodeValue = antes; b.classList.remove('copiado'); }, 1800);
+          clearTimeout(b._copiado);
+          b._copiado = setTimeout(function () { t.nodeValue = b.dataset.rotulo; b.classList.remove('copiado'); }, 1800);
         };
-        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texto).then(ok, function () { manual(alvo); ok(); });
-        else { manual(alvo); ok(); }
+        if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+          navigator.clipboard.writeText(texto).then(ok, function () { if (manual(alvo)) ok(); });
+        } else if (manual(alvo)) ok();
       });
     });
     function manual(el) {
-      try { el.removeAttribute('aria-hidden'); el.select(); document.execCommand('copy'); el.setAttribute('aria-hidden', 'true'); } catch (e) {}
+      try {
+        el.removeAttribute('aria-hidden');
+        el.select();
+        var feito = document.execCommand('copy');
+        el.setAttribute('aria-hidden', 'true');
+        return feito;
+      } catch (e) { return false; }
     }
 
+    // PDF: abre os detalhes do relatório (buscas da IA) para irem ao papel e fecha depois.
+    // Vale para o botão e para Ctrl/Cmd+P.
+    var detalhes = function () { return document.querySelectorAll('.conteudo details.mais'); };
+    window.addEventListener('beforeprint', function () {
+      detalhes().forEach(function (d) { d.dataset.estava = d.open ? '1' : ''; d.open = true; });
+    });
+    window.addEventListener('afterprint', function () {
+      detalhes().forEach(function (d) { if (d.dataset.estava != null) { d.open = d.dataset.estava === '1'; delete d.dataset.estava; } });
+    });
     document.querySelectorAll('[data-imprimir]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        document.querySelectorAll('details').forEach(function (d) { d.dataset.estava = d.open ? '1' : ''; });
-        window.print();
-      });
+      b.addEventListener('click', function () { window.print(); });
     });
 
     // botão de gerar: evita o duplo envio
@@ -34,7 +51,10 @@
       f.addEventListener('submit', function () {
         var b = f.querySelector('button');
         if (!b) return;
-        setTimeout(function () { b.disabled = true; b.lastChild.nodeValue = f.getAttribute('data-enviando'); }, 0);
+        setTimeout(function () {
+          b.disabled = true;
+          if (b.lastChild && b.lastChild.nodeType === 3) b.lastChild.nodeValue = f.getAttribute('data-enviando');
+        }, 0);
       });
     });
 

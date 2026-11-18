@@ -18,7 +18,7 @@
     <p>Palavras-chave, canais e cidades que trazem pacientes, e um relatório da IA com as próximas campanhas do Google.</p>
   </div>
   <div class="cabeca__acoes">
-    <a class="btn sec" href="/admin/mapa?p=<%= period.key %><%= sel ? '&pg=' + sel.id : '' %>"><%- icon('mapa') %>Ver no mapa</a>
+    <a class="btn sec" href="/admin/mapa?<%= periodQs %><%= sel ? '&pg=' + sel.id : '' %>"><%- icon('mapa') %>Ver no mapa</a>
   </div>
 </div>
 
@@ -26,8 +26,8 @@
 <% if (live.length > 1) { %>
   <div class="filtros">
     <div class="segmento" role="group" aria-label="Página">
-      <a class="chip" href="<%= base %>?p=<%= period.key %>" <%- !sel ? 'aria-current="true"' : '' %>>Todas as páginas</a>
-      <% live.forEach(function (p) { %><a class="chip" href="<%= base %>?p=<%= period.key %>&pg=<%= p.id %>" <%- sel && sel.id === p.id ? 'aria-current="true"' : '' %>><%= fmt.corta(p.name, 34) %></a><% }) %>
+      <a class="chip" href="<%= base %>?<%= periodQs %>" <%- !sel ? 'aria-current="true"' : '' %>>Todas as páginas</a>
+      <% live.forEach(function (p) { %><a class="chip" href="<%= base %>?<%= periodQs %>&pg=<%= p.id %>" <%- sel && sel.id === p.id ? 'aria-current="true"' : '' %>><%= fmt.corta(p.name, 34) %></a><% }) %>
     </div>
   </div>
 <% } %>
@@ -94,7 +94,7 @@
     <%- include('partials/kpi', { rotulo: 'Visitas do Google Ads', valor: fmt.int(ads.totais.visitas), d: ads.totais_periodo_anterior ? fmt.delta(ads.totais.visitas, ads.totais_periodo_anterior.visitas) : null, sub: fmt.int(ads.totais.leads) + ' leads · ' + pctN(ads.totais.taxa_lead_pct) }) %>
     <%- include('partials/kpi', { rotulo: 'Busca orgânica', valor: fmt.int(org.totais.visitas), sub: fmt.int(org.totais.leads) + ' leads · ' + pctN(org.totais.taxa_lead_pct) }) %>
     <%- include('partials/kpi', { rotulo: 'Palavras-chave com visita', valor: fmt.int(palavras.length + (ads.palavras_chave_omitidas || 0)), sub: fmt.int(palavras.filter(function (p) { return p.leads > 0; }).length) + ' com lead' }) %>
-    <%- include('partials/kpi', { rotulo: 'Leads no total', valor: fmt.int(data.totais.leads), d: data.totais_periodo_anterior ? fmt.delta(data.totais.leads, data.totais_periodo_anterior.leads) : null, sub: pctN(data.totais.taxa_lead_pct) + ' das visitas' }) %>
+    <%- include('partials/kpi', { rotulo: 'Leads de visitas medidas', valor: fmt.int(data.totais.leads), d: data.totais_periodo_anterior ? fmt.delta(data.totais.leads, data.totais_periodo_anterior.leads) : null, sub: pctN(data.totais.taxa_lead_pct) + ' das visitas' + (data.leads_sem_visita_medida ? ' · mais ' + fmt.int(data.leads_sem_visita_medida) + ' sem dados de navegação' : '') }) %>
   </dl>
 
   <section class="card" aria-labelledby="kw-titulo">
@@ -136,6 +136,9 @@
   <div class="grade-2">
     <section class="card" aria-labelledby="canais-titulo">
       <div class="card__topo"><div><h2 id="canais-titulo">Canais</h2><p>Todas as origens, inclusive a busca orgânica.</p></div></div>
+      <% if (!data.canais.length) { %>
+        <p class="vazio">Nenhuma visita neste período.</p>
+      <% } else { %>
       <div class="rolagem">
         <table>
           <thead><tr><th>Canal</th><th class="n">Visitas</th><th class="n">Leads</th><th class="n">Taxa</th><th class="n">Tempo</th></tr></thead>
@@ -146,9 +149,10 @@
           </tbody>
         </table>
       </div>
+      <% } %>
     </section>
     <section class="card" aria-labelledby="cidades-titulo">
-      <div class="card__topo"><div><h2 id="cidades-titulo">Cidades</h2><p>Aproximada pela conexão de internet.</p></div><a class="pequeno" href="/admin/mapa?p=<%= period.key %><%= sel ? '&pg=' + sel.id : '' %>">Abrir o mapa</a></div>
+      <div class="card__topo"><div><h2 id="cidades-titulo">Cidades</h2><p>Aproximada pela conexão de internet.</p></div><a class="pequeno" href="/admin/mapa?<%= periodQs %><%= sel ? '&pg=' + sel.id : '' %>">Abrir o mapa</a></div>
       <% const cid = data.localizacao.cidades.slice(0, 8); if (!cid.length) { %>
         <p class="vazio">Ainda sem visitas com cidade. A localização começou em 18/11/2026.</p>
       <% } else { %>

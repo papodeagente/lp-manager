@@ -84,15 +84,12 @@ const setWebhookUrl = db.prepare('UPDATE lps SET webhook_url = ? WHERE slug = ?'
 
 const pages = makePages(db);
 // Localização aproximada: quando a base abre (boot ou base nova do mês), completa os
-// leads antigos que têm IP e passa a cidade do lead para a visita que converteu.
+// leads antigos que têm IP. A visita não recebe a cidade do lead: se só as visitas que
+// converteram ganhassem cidade, a taxa por cidade sairia inflada.
 const geoFill = {
   leads: db.prepare('SELECT id, ip FROM leads WHERE geo_country IS NULL AND ip IS NOT NULL AND ip != \'\' LIMIT 500'),
   setLead: db.prepare(`UPDATE leads SET geo_country = @geo_country, geo_region = @geo_region, geo_city = @geo_city,
     geo_lat = @geo_lat, geo_lon = @geo_lon WHERE id = @id`),
-  visits: db.prepare(`UPDATE visits SET (geo_country, geo_region, geo_city, geo_lat, geo_lon) =
-      (SELECT l.geo_country, l.geo_region, l.geo_city, l.geo_lat, l.geo_lon FROM leads l
-        WHERE l.visit_id = visits.id AND l.geo_country IS NOT NULL ORDER BY l.created_at LIMIT 1)
-    WHERE geo_country IS NULL AND EXISTS (SELECT 1 FROM leads l WHERE l.visit_id = visits.id AND l.geo_country IS NOT NULL)`),
 };
 function backfillGeo() {
   let n = 0;
@@ -103,8 +100,7 @@ function backfillGeo() {
     db.transaction(() => { for (const r of rows) geoFill.setLead.run({ id: r.id, ...geoColumns(geo, r.ip) }); })();
     n += rows.length;
   }
-  const v = geoFill.visits.run().changes;
-  if (n || v) console.log(`[geo] localização completada em ${n} lead(s) e ${v} visita(s)`);
+  if (n) console.log(`[geo] localização completada em ${n} lead(s)`);
 }
 const geo = makeGeo({ dataDir: DATA_DIR, onReady: () => { try { backfillGeo(); } catch (e) { console.error('[geo] completar:', e.message); } } });
 const tracking = makeTracking(db, pages, geo);

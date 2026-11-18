@@ -273,10 +273,15 @@
     if (!b) return;
     var alvo = d.getElementById(b.getAttribute('data-copiar'));
     var texto = alvo ? (alvo.value || alvo.textContent) : b.getAttribute('data-texto');
+    if (texto == null) return;
+    // troca só o texto do botão (o ícone fica) e guarda o rótulo original uma vez só
     var feito = function () {
-      var antes = b.textContent;
-      b.textContent = 'Copiado';
-      setTimeout(function () { b.textContent = antes; }, 1600);
+      var t = b.lastChild && b.lastChild.nodeType === 3 ? b.lastChild : null;
+      if (!t) { t = d.createTextNode(''); b.appendChild(t); }
+      if (b.dataset.rotulo == null) b.dataset.rotulo = t.nodeValue;
+      t.nodeValue = 'Copiado';
+      clearTimeout(b._copiado);
+      b._copiado = setTimeout(function () { t.nodeValue = b.dataset.rotulo; }, 1600);
     };
     if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(texto).then(feito, function () {});
     else if (alvo && alvo.select) { alvo.select(); try { d.execCommand('copy'); feito(); } catch (err) {} }

@@ -536,7 +536,11 @@ pre{font-family:var(--mono);font-size:12.5px}
   }
   .lateral,.barra-cel{display:none!important}
   .app{display:block}
-  .conteudo{max-width:none;padding:0}
-  .card,.kpi{border:1px solid var(--linha);break-inside:avoid}
+  /* fora do grid: cartão maior que a folha num grid deixava páginas em branco */
+  .conteudo{max-width:none;padding:0;display:block}
+  .conteudo>*+*{margin-top:16px}
+  .card,.kpi{border:1px solid var(--linha)}
+  .kpi,tr,li,.recentes li{break-inside:avoid}
+  .rolagem{overflow:visible}
   .entrar{background:none}
 }
