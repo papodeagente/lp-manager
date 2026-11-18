@@ -38,7 +38,7 @@
     <div class="ia__texto">
       <p class="ia__selo"><%- icon('inteligencia') %>Relatório com IA</p>
       <h2 id="ia-titulo">Melhores palavras-chave e novas campanhas</h2>
-      <p>A IA lê os números deste período (palavras-chave, canais, cidades, horários e aparelhos), o texto das páginas<%= cfg.web ? ' e pesquisa a concorrência na web' : '' %>. Devolve o que manter, o que cortar, palavras novas, negativas, a estrutura das campanhas e os anúncios prontos. Nenhum dado pessoal dos leads é enviado.</p>
+      <p>A IA lê os números deste período (palavras-chave, canais, cidades, horários e aparelhos)<%= cfg.web ? ', o texto das páginas e pesquisa a concorrência na web' : ' e o texto das páginas' %>. Devolve o que manter, o que cortar, palavras novas, negativas, a estrutura das campanhas e os anúncios prontos. Nenhum dado pessoal dos leads é enviado.</p>
     </div>
     <% if (running) { %>
       <div class="ia__andamento" data-acompanhar="/admin/inteligencia/relatorios/<%= running.id %>/status" data-ir="/admin/inteligencia/relatorios/<%= running.id %>">

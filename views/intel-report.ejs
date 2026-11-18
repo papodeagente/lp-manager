@@ -17,6 +17,13 @@
   const sitesDaBusca = sources && Array.isArray(sources.sites) ? sources.sites : null;
   const fonteOk = function (u) { return u && (!sitesDaBusca || sitesDaBusca.indexOf(hostOf(u)) >= 0); };
   const semWeb = r.web_search === 0;
+  const fontesPesq = lista(o.pesquisa_de_mercado).map(function (f) { const u = safeUrl(f.fonte_url); return { f: f, u: u, ok: !!u && fonteOk(u) }; });
+  const semConf = fontesPesq.filter(function (x) { return x.u && !x.ok; }).length;
+  const comConf = fontesPesq.filter(function (x) { return x.ok; }).length;
+  const subPesq = semWeb ? 'Relatório gerado sem pesquisa na web: confira estes pontos antes de usar.'
+    : (semConf && !comConf) ? 'Nenhuma destas fontes apareceu na lista de sites da busca: confira cada uma antes de usar.'
+    : semConf ? 'O que a IA encontrou na web, com a fonte. A fonte que não apareceu na busca vem sem link.'
+    : 'O que a IA encontrou na web, com a fonte.';
   const segundos = usage && usage.segundos;
 %>
 <div class="cabeca">
@@ -236,10 +243,10 @@
 
   <% if (lista(o.pesquisa_de_mercado).length || buscas.length) { %>
     <section class="card" aria-labelledby="pesq-titulo">
-      <div class="card__topo"><div><h2 id="pesq-titulo">Pesquisa de mercado</h2><p><%= semWeb ? 'Relatório gerado sem pesquisa na web: confira estes pontos antes de usar.' : 'O que a IA encontrou na web, com a fonte.' %></p></div></div>
+      <div class="card__topo"><div><h2 id="pesq-titulo">Pesquisa de mercado</h2><p><%= subPesq %></p></div></div>
       <ul class="fontes">
-        <% lista(o.pesquisa_de_mercado).forEach(function (f) { const u = safeUrl(f.fonte_url); %>
-          <li><p><%= f.achado %></p><% if (u && fonteOk(u)) { %><a href="<%= u %>" target="_blank" rel="noopener noreferrer nofollow"><%= hostOf(u) %></a><% } else if (u) { %><span class="fonte-sem-link" title="Este site não apareceu na busca da IA; confira antes de abrir."><%= hostOf(u) %> (fonte não confirmada)</span><% } %></li>
+        <% fontesPesq.forEach(function (x) { %>
+          <li><p><%= x.f.achado %></p><% if (x.ok) { %><a href="<%= x.u %>" target="_blank" rel="noopener noreferrer nofollow"><%= hostOf(x.u) %></a><% } else if (x.u) { %><span class="fonte-sem-link"><%= x.u %> · fonte não confirmada</span><% } %></li>
         <% }) %>
       </ul>
       <% if (buscas.length) { %>
