@@ -89,8 +89,8 @@ Cada visita nova ganha país, estado, cidade e o centro da cidade, consultados n
 gratuita DB-IP City Lite (licença CC BY 4.0, baixada para `DATA_DIR/geo` e trocada uma vez por mês). O IP da
 visita não é guardado, só a cidade; o do lead já era guardado e os leads antigos ganham cidade quando a base
 abre. A precisão é a da operadora: quem mora numa cidade vizinha pode aparecer na cidade dela. A base do
-volume abre logo no boot; erro do sistema ao abrir (permissão, disco) não apaga o arquivo, e base ilegível é
-apagada e baixada de novo.
+volume abre antes de a porta abrir (no boot nenhuma visita fica sem cidade); erro do sistema ao abrir
+(permissão, disco) não apaga o arquivo, e base ilegível é apagada e baixada de novo.
 
 `/admin/mapa` mostra visitas, contatos ou leads por cidade, com filtro de período, página e canal (Google
 Ads, busca orgânica, redes sociais, direto, IA...). O mapa é Leaflet (`public/vendor/leaflet`, licença
@@ -120,10 +120,12 @@ servidor.
 Textos que vêm de links e cliques (UTM, rótulo do clique, caminho de entrada) podem ser escritos por
 qualquer pessoa. No pacote para a IA (só nele: a tela da Central mostra os valores como são), endereço não
 chega inteiro: o ponto vira `[.]` e o dois-pontos vira `[:]` (`evil[.]com`), caracteres invisíveis saem e o
-valor é cortado no tamanho máximo antes da limpeza. Conta como endereço o que tem esquema, `//`, `www.`, IP
-ou um nome com ponto cuja última parte é um domínio de verdade (lista da IANA em `lib/tlds.js`, com IDN como
-`.рф`); letra larga, ponto ideográfico e `%2e` também revelam endereço. Nome de campanha com ponto
-(`bsb.search.botox`, `Botox.DF`) fica como está. A conta é feita com o valor como foi gravado (os números do
+valor é cortado no tamanho máximo antes da limpeza. Conta como endereço o que tem esquema (`https:` também sem
+as barras ou grudado em `-`), `//`, `www.`, IP ou um nome com ponto cuja última parte é um domínio de verdade
+(lista da IANA em `lib/tlds.js`, com IDN como `.рф`); letra larga, ponto ideográfico e `%XX` (`%2e`,
+`%E3%80%82`) também revelam endereço, e site sem ponto (IP em número) tem as barras quebradas (`/[/]`). Nome de
+campanha com ponto (`bsb.search.botox`, `Botox.DF`) fica como está; o que termina numa palavra que também é
+domínio (`Search.Promo`, `@clinica.spa`) vai com `[.]`, que a IA lê do mesmo jeito. A conta é feita com o valor como foi gravado (os números do
 pacote são os da tela) e só os nomes que entram no pacote são limpos, então milhares de valores inventados não
 pesam na geração. O prompt manda tratar esses campos como dados: analisar normalmente, sem abrir, visitar ou
 citar o que vem com `[.]`. O relatório anterior também vai limpo.

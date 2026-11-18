@@ -1353,6 +1353,9 @@ bootData();
 pruneTracking();
 setInterval(pruneTracking, 24 * 3600 * 1000).unref();
 
+// a base de localização do volume abre antes da porta (visita sem cidade não ganha cidade
+// depois); com o disco lento, a porta abre assim mesmo em 15 s e a base chega em seguida
+await Promise.race([geo.abrirLocal(), new Promise((ok) => setTimeout(ok, 15000).unref())]).catch(() => {});
 geo.start();
 
 app.listen(PORT, '0.0.0.0', () => {

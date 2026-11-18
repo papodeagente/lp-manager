@@ -19,18 +19,16 @@
   const fonteOk = function (u) { return u && (!sitesDaBusca || sitesDaBusca.indexOf(hostOf(u)) >= 0); };
   const semWeb = r.web_search === 0;
   // endereço sem "https://" (ex.: "support.google.com/...") vale como https; o resto vai como texto
-  const urlDa = function (v) {
-    const s = String(v || '').trim();
-    return safeUrl(s) || (/^[^\s\/:@]+\.[^\s\/:@]+(\/\S*)?$/.test(s) ? safeUrl('https://' + s) : null);
-  };
   const fontesPesq = lista(o.pesquisa_de_mercado).map(function (f) {
-    const bruto = String(f.fonte_url || '').trim(); const u = urlDa(bruto);
+    const bruto = String(f.fonte_url || '').trim(); const u = fonteUrl(bruto);
     return { f: f, u: u, bruto: bruto, ok: !!u && fonteOk(u) };
   });
   const semConf = fontesPesq.filter(function (x) { return !x.ok; }).length;
   const comConf = fontesPesq.length - semConf;
+  const semFonte = fontesPesq.filter(function (x) { return !x.bruto; }).length;
   const subPesq = semWeb ? 'Relatório gerado sem pesquisa na web: confira estes pontos antes de usar.'
     : !fontesPesq.length ? 'A IA pesquisou na web, mas não registrou achados neste relatório.'
+    : semFonte === fontesPesq.length ? 'A IA não informou a fonte destes achados: confira cada um antes de usar.'
     : semLista ? 'Não deu para conferir as fontes desta vez: confira cada uma antes de usar.'
     : (sitesDaBusca && !buscas.length) ? 'A IA não chegou a pesquisar na web neste relatório: confira cada fonte antes de usar.'
     : !comConf ? 'Nenhuma destas fontes apareceu na lista de sites da busca: confira cada uma antes de usar.'
